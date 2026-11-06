@@ -1,0 +1,2 @@
+# 统一换行，避免 Windows 上把 .sh 写成 CRLF 导致 Linux 端执行失败
+* text=auto eol=lf
