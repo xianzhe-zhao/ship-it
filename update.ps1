@@ -1,4 +1,4 @@
-# 一键更新：拉取 ship-it 最新版本
+﻿# 一键更新：拉取 ship-it 最新版本
 # 用法: .\update.ps1
 # 前提: 已通过 git clone 安装本仓库（不是 .skill 解压安装）
 $ErrorActionPreference = 'Stop'
@@ -21,5 +21,5 @@ Write-Host ""
 Write-Host "确认当前版本："
 $skillMd = Join-Path $repo 'ship-it\SKILL.md'
 if (Test-Path $skillMd) {
-    Get-Content $skillMd -TotalCount 5 | Select-String 'version'
+    Get-Content $skillMd -TotalCount 5 | Select-String 'version:'
 }
