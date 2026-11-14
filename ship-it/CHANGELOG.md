@@ -1,5 +1,17 @@
 # Changelog — ship-it
 
+## 4.2.0（2026-11-15）
+
+**CI/CD 自动发布通道**：skill 部署相关内容此前全部假设"agent 手动/脚本部署"；本项目用户已在实际项目落地 GitHub Actions + 自托管 Runner 双分支自动发布（test→测试环境、main 合并→生产），本次为 9 步流程补上 CI/CD 通道（条件分支，不影响手动部署项目）。
+
+- **前置「判断系统形态」新增「部署通道」维度**：手动/脚本部署 vs CI/CD 自动发布；判定依据 = 项目文档与流水线配置文件（`.github/workflows/`、`.gitlab-ci.yml`）中的分支→环境部署映射（只有测试/构建 job 不算）；CI/CD 时把 分支→环境→workflow 名记入项目 runbook；无法判定直接问用户。
+- **Step 4 部署测试系统拆双通道**：通道 B（CI/CD）= 推分支触发 → **等 workflow 结论 success** → 核对线上版本/产物与待测 commit 一致 → 才跑回归；workflow 失败/取消/卡住 → 遇阻即停，**禁止手动部署绕过**（环境与 git 漂移，下次自动部署覆盖手工改动）。手动部署指引原样保留为通道 A。
+- **Step 6 加验收前部署确认**：通知用户"测试环境已更新"前必须确认 workflow success 且线上版本与待验收 commit 一致，不让用户验收旧版本；汇报模板新增"部署"行。
+- **Step 8 补 CI/CD 发布语义与回滚变体**：合并 PR = 触发生产部署（合并就是发布动作，用户验收未过不得合并）；workflow 绿灯不免除独立端到端验证；回滚预案表加 CI/CD 变体——当前版本 = main commit/成功 run，回滚动作 = `git revert` 推回 main 自动重部署或重跑旧 run；禁止手改服务器回滚，应急介入事后以 commit 补回。
+- **常见坑表 +3 行**：workflow 未完成就跑回归（旧版本假通过）/ 为消流水线警告 `|| true` 吞掉真失败 / 手改服务器救火（真源漂移下次被冲掉）。
+- **`references/project-adaptation.md` 逐项替换清单与接入检查清单补 CI/CD 项**：分支→环境→workflow 映射、runner 形态、CI/CD 回滚方式、workflow 状态查询命令。
+- spec：`docs/specs/2026-11-15-cicd-auto-release-adapt.md`。
+
 ## 4.1.0（2026-11-11）
 
 **防能力幻觉与防契约逃逸**：补两道"同源共错"防线（agent 既是执行者又自判合规的漏洞）。
