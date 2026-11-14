@@ -77,7 +77,7 @@ cd ship-it
 
 ### 方式二：下载 .skill 文件（不想碰 git）
 
-从 [Releases](../../releases) 下载 `ship-it.skill`，解压到 `~/.agents/skills/ship-it/` 即可。这种方式**无法一键更新**，每次升级需重新下载。
+从 [Releases](https://github.com/xianzhe-zhao/ship-it/releases) 下载 `ship-it.skill`，解压到 `~/.agents/skills/ship-it/` 即可。这种方式**无法一键更新**，每次升级需重新下载。
 
 ## 更新
 
