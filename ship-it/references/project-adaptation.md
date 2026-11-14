@@ -66,6 +66,9 @@
 ### 逐项替换清单（接入时照着填）
 
 - 系统形态：有无测试/正式系统（决定 Step 3 / 7 是否执行）
+- 部署通道：手动/脚本部署 vs CI/CD 自动发布；CI/CD 时记录**分支→环境→workflow 名映射**与 runner 形态（云托管/自托管）
+- CI/CD 回滚方式：`git revert` 推回 main 触发自动重部署 / 重跑旧 workflow run；禁止手改服务器
+- workflow 状态查询命令：`gh run watch` / `gh run list --branch <分支>`（或对应平台的 pipeline 查询方式）
 - 核心功能清单：首次接入时问用户要（核心路由/接口/模块），写进 runbook，Step 3.2 分级回归的依据
 - 安全审查周期：默认每月一次；高危项目（对外暴露/处理敏感数据）每周
 - 服务与端口、部署脚本、健康检查地址
@@ -102,6 +105,7 @@
 - [ ] 全局 skill 已安装，且是 junction/symlink（改源仓库即时生效）
 - [ ] 项目约定文件里写明"执行 ship-it"，并列出本项目超出通用流程的规则
 - [ ] `docs/deploy-runbook.md` 覆盖：环境值、部署、回退、验证、回滚卡、服务红线、核心功能清单、安全审查周期
+- [ ] CI/CD 项目：runbook 记录了部署通道（分支→环境→workflow 映射）与 CI/CD 回滚方式（revert 重部署）
 - [ ] `docs/specs/_TEMPLATE.md` 已复制并标注来源
 - [ ] 步骤编号与 skill 对齐，有意偏离处已显式标注
 - [ ] 文档内无凭据、无内网地址、无真实账号
