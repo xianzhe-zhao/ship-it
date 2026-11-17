@@ -9,7 +9,7 @@
 - **部署通道**：手动/脚本（真源 junction 模式）。`install.ps1`/`install.sh` 给 `ship-it/` 在 `~/.agents/skills/` 建 junction/symlink；`update.ps1`/`update.sh` 执行 `git pull`；`build.ps1`/`build.sh` 打包 `.skill` 到 `dist/`（不入库）。
 - **生效时机**：改 `ship-it/` 下文件存盘即生效（DSH/Codex 实时重扫 `~/.agents/skills`）；skill 正文变更需**下一轮对话**重新加载才被模型读到。无 CI/CD 自动发布（仓库无 `.github/workflows`）。
 - **版本来源（唯一真源）**：`ship-it/SKILL.md` frontmatter `version` + `ship-it/CHANGELOG.md`（skill 版本）+ `CHANGELOG.md`（仓库分发记录）。三处必须一致。
-- **凭据纪律**：本文件及全仓库**不写任何密钥值**。DSH 宿主 Token Plan 凭据见 `~/.dsh/.credentials.yaml` 的 `BAILIAN_TPP_API_KEY`（环境变量名，非值），不入库。
+- **凭据纪律**：本文件及全仓库**不写任何密钥值**。办公环境 `aipro` 的凭据环境变量名为 `AIPRO_API_KEY`（值见 `~/.dsh/.credentials.yaml`，不入库）；家用环境 Token Plan 用 `BAILIAN_TPP_API_KEY`。
 
 ## 核心功能清单（分级回归依据，只读）
 
@@ -28,12 +28,70 @@
 
 ---
 
-## 模型能力清单（环境级信息：DSH 宿主 Token Plan / bailian-tpp）
+## 环境识别（决定用哪套模型配置，v4.4.0+）
 
-> 最近更新：2026-11-16（Token Plan /models 端点可用目录 + 联网核实官方文档 + 实测探针 + 核对 DSH 宿主配置）。
-> 来源：**Token Plan 可用文本模型目录 15 个**（经 /models 端点 + 本会话探针实测：64×64/128×128 PNG 图像输入、思考档位、function calling、多轮回传 + 官方文档核实）；**DSH 宿主 `cordis.patch.yml` 当前已配置其中 7 个**（下表「DSH 已配置」列 ✅ 标注，⬜ = Token Plan 可用但当前未配置）。配置可能被精简/滞后，以实际为准；未配置模型需先在宿主配置方可分配。
-> 图像输入列 = 官方声明 + 本环境探针结果；单次请求图片上限未单独探针，由 DSH 路由级 `maxRequestImageBytes`/`requestImagePixelBudget` 控制，记「未知」。
-> **成本档位/折扣列为可选**（本次新增），用于能力满足后的性价比排序；促销价为时效信息，见下方到期回退。
+| 环境 | 识别依据 | 配置真源 | 备注 |
+|---|---|---|---|
+| **办公环境** | `USERDOMAIN=CORP`、存在公司 HTTP 代理（`HTTP_PROXY=http://109.2.0.41:9090`）、`COMPUTERNAME=XIANZHE-ZHAO01` | `~/.dsh/profiles/desktop/cordis.patch.yml` | 2026-11-17 实测 |
+| **家用环境** | 无 CORP 域、无公司代理 | 预期 `~/.dsh/profiles/<profile>/cordis.patch.yml`（**未实测**；C7 配置真源项待补全） | 下方家用节沿用 2026-11-16 记录，**本机未实测** |
+
+> **识别顺序**：先看 `USERDOMAIN` 与代理环境变量；两者都不匹配 → 记「未知环境」，**只允许用会话默认模型**，并提示用户补充该环境配置，不得套用其他环境的分配。
+> **会话策略固化（重要）**：DSH 的子代理白名单 `allowedModels` 在**会话创建时**写入会话事件流（`subagent/model-selection-policy`）并持久固化，改宿主配置只对**新开会话**生效。
+> 两类报错含义不同：`has no configured model` = 模型池里没有该 ID（改 ID）；`not allowed for this Session` = 会话白名单未放行（**新开会话**，不要反复改配置）。
+> 模型列表查询工具：`list_subagent_models`（传 provider + model 验证单条路由）。旧版文档所称 `~/.dsh/settings.yaml` 在新版 DSH 可能不存在。
+
+---
+
+## 模型能力清单 · 办公环境（provider: `aipro`，实测 2026-11-17）
+
+> 来源：`~/.dsh/profiles/desktop/cordis.patch.yml` 实读 + `list_subagent_models` 探针。
+> provider `aipro` 为本地网关（`baseURL: http://127.0.0.1:15721/v1`），当前模型池仅 3 个模型。
+> 成本列沿用 Token Plan 目录口径，仅作相对贵贱排序参考；`aipro` 网关的**实际计费口径未核实**（未核实即标注，不臆断）。
+
+| 模型 ID | 上下文大小 | 图像输入 | 成本档位/折扣 | 备注（来自宿主配置） | 可派发（实测） |
+|---|---|---|---|---|---|
+| `DeepSeek-V4.1-Flash-1017` | 1048576 | ✅ `[text, image]` | 轻快档 1/4，夜间 5 折（Token Plan 口径） | 宿主默认模型（`agent-default-model`）；思考档 low/high/xhigh/max；1M 上下文，适合主脑与长上下文角色 | ✅ 已放行（2026-11-17 实测，会话 `dsh-1812d807-63a2`） |
+| `GLM-5.2-NVFP4` | 524288 | ❌ `[text]` | GLM 档 8/28（Token Plan 口径） | **纯文本**，不可承担读图角色（测试员截图认证）；思考档 off/low/medium/high/xhigh，可关思考 | ✅ 已放行（2026-11-17 实测，会话 `dsh-1812d807-63a2`） |
+| `QWEN3.8-27B-FP8-256K` | 262144 | ✅ `[text, image]` | 待核（宿主未标注） | 256K 上下文；思考档 low/medium；轻快，适合前端/说明员等中等任务 | ✅ 已放行（2026-11-17 实测，会话 `dsh-1812d807-63a2`） |
+
+> 「可派发」列口径：必须由 `list_subagent_models` **实测放行**才可写 ✅，并注明验证会话与日期。未实测一律写 ⚠️ 或「未验证」。
+> **2026-11-17 缺陷记录（已闭环）**：`allowedModels` 原配置为 `glm-5.2` / `qwen3.8-27b`（错误别名，模型池真实 ID 为 `GLM-5.2-NVFP4` / `QWEN3.8-27B-FP8-256K`），导致 GLM/Qwen 子代理全部派发失败。用户于当日改为三个真实 ID 后，**新会话 `dsh-1812d807-63a2` 实测三条路由全部放行**，验证了「改配置只对新会话生效」这一会话策略固化机制。
+>
+> **实测记录（C8 证据，2026-11-17 11:07，会话 `dsh-1812d807-63a2`）**：
+>
+> | 路由 | 返回模型 | 思考档 | 结果 |
+> |---|---|---|---|
+> | `aipro/GLM-5.2-NVFP4` | GLM-5.2-512K | off/low/medium/high/xhigh | ✅ 放行 |
+> | `aipro/QWEN3.8-27B-FP8-256K` | QWEN3.8-27B-256K | low/medium | ✅ 放行 |
+> | `aipro/DeepSeek-V4.1-Flash-1017` | DeepSeek-V4.1-Flash-1017-1M | low/high/xhigh/max | ✅ 放行 |
+>
+> 三次 `list_subagent_models(provider=aipro, model=<ID>)` 均返回模型信息，未出现 `has no configured model` / `not allowed for this Session`。
+
+### 角色分配 · 办公环境
+
+> 硬要求 > 软要求 > 性价比。测试员「必须图像输入」为硬要求 → **GLM-5.2-NVFP4 纯文本，不可当测试员**。
+> 主脑 = 会话模型（当前 `DeepSeek-V4.1-Flash-1017`），固定不分配；`spawn_teammate` 继承主脑模型，指定模型需经 `workflow` 的 `agent(prompt,{provider,model})`。
+
+| 角色 | 分配模型 | 理由（能力 + 成本） |
+|---|---|---|
+| 主脑 | `DeepSeek-V4.1-Flash-1017`（会话模型） | 1M 上下文 + 轻快档；主脑轮次最多、上下文最长，便宜大上下文最划算 |
+| 需求澄清员 | `DeepSeek-V4.1-Flash-1017` | 联网搜索由宿主工具提供；1M 利于大量资料归纳 |
+| 后端开发 | `DeepSeek-V4.1-Flash-1017` | 1M 大上下文 + 编码能力；与主脑同模型可复用上下文缓存 |
+| 前端开发 | `QWEN3.8-27B-FP8-256K` | 无特殊能力要求；256K 足够页面级改动，轻快省 Credits |
+| 代码审查员 | `GLM-5.2-NVFP4` | 512K 大上下文 + 强推理 + 可关思考；纯文本足够（审查读代码不读图） |
+| 测试员 | `QWEN3.8-27B-FP8-256K` | **图像输入 ✅（硬要求）**；256K 够截图认证；轻快 |
+| 改动说明员 | `QWEN3.8-27B-FP8-256K` | 无特殊能力要求；轻快 |
+
+> 三条路由已于 **2026-11-17 在会话 `dsh-1812d807-63a2` 实测放行**，上表分配可直接派发。
+> 换环境或改过 `allowedModels` 后仍受「会话策略固化」约束：**须新开会话重测三条路由**，未重测前按「不可派发」处理。
+
+---
+
+## 模型能力清单 · 家用环境（provider: `bailian-tpp` / Token Plan，记录于 2026-11-16，**本机未实测**）
+
+> 来源：Token Plan 可用文本模型目录 15 个（经 /models 端点 + 探针实测：64×64/128×128 PNG 图像输入、思考档位、function calling、多轮回传 + 官方文档核实）；DSH 宿主 `cordis.patch.yml` 当时配置其中 7 个。
+> ⚠️ **本节未经本机（办公环境）实测**，为家用环境历史记录；在家用机器上使用前，须按 C8 用 `list_subagent_models` 逐条验证并把结果写回本表。
+> ⚠️ **冻结状态（C7 不变式）**：下表模型 ID 沿用 2026-11-16 记录，其"小写无后缀"形式与办公环境已确认的别名问题（`glm-5.2` → 真 ID `GLM-5.2-NVFP4`）同构，**实测前一律视为疑似别名，不得作为角色分配依据**；角色分配只认「DSH 已配置 ✅ + 实测放行」双满足项。
 
 | 模型 ID | 上下文大小 | 图像输入 | 单次请求图片上限 | 成本档位/折扣（可选） | 备注（擅长定位，联网核实） | DSH 已配置 |
 |---|---|---|---|---|---|---|
@@ -56,15 +114,16 @@
 > 成本档位数字为**按量计费目录价（元/百万 token，输入/输出）**，仅作相对贵贱排序代理；Token Plan 实际按 **Credits 动态计费**（无固定 token 换算，由模型档位/token 量/思考模式/工具调用决定），真实消耗以控制台订阅页用量详情为准。
 > 另有 `decision-model-preview`（限时免费，0 Credits）为**决策模型**（分类/打分，非通用聊天），不在本 15 模型分配清单内；高频分诊可单独接入。
 
-### 角色分配（本环境，能力驱动 + 性价比排序）
+### 角色分配 · 家用环境
 
 > 硬要求 > 软要求 > 性价比。测试员「必须图像输入」为硬要求，成本不得覆盖。主脑=会话模型固定，不分配。
 > DSH 映射注意：`spawn_teammate` **继承主脑会话模型**（无模型参数）；本表为配置级意图，指定模型需经 `workflow` 的 `agent(prompt,{provider,model})` 或切换会话模型。
-> **角色分配只使用「DSH 已配置 ✅」模型**；⬜ 未配置模型需先在宿主 cordis.patch.yml 配置方可分配。当前已配置 7 个：auto, qwen4-max-preview, qwen3.8-max, qwen3.8-flash, qwen3.7-plus, qwen3.6-flash, glm-5.3。
+> **角色分配只使用「DSH 已配置 ✅」模型**；⬜ 未配置模型需先在宿主 cordis.patch.yml 配置方可分配。该环境当时已配置 7 个：auto, qwen4-max-preview, qwen3.8-max, qwen3.8-flash, qwen3.7-plus, qwen3.6-flash, glm-5.3。
+> ⚠️ 本表沿用 2026-11-16 记录，**未经本机（办公环境）实测**；在家用机器上启用前须逐条 `list_subagent_models` 验证。
 
 | 角色 | 分配模型 | 理由（能力 + 成本） |
 |---|---|---|
-| 主脑 | 会话模型（当前 qwen3.8-flash） | 固定，不分配 |
+| 主脑 | 会话模型（该环境默认） | 固定，不分配 |
 | 需求澄清员 | qwen3.8-flash | 联网搜索由宿主工具提供；轻快性价比 |
 | 后端开发 | qwen4-max-preview | 1M 大上下文+旗舰编码+预览 2 折；**11-25 后回退 qwen4-max / qwen3.8-max** |
 | 前端开发 | qwen3.8-flash | 无特殊能力要求；轻快，夜间 4 折 |
@@ -139,3 +198,5 @@ python ship-it\scripts\check_spec.py docs\specs\<文件> --stage verify
 - 会话实际路由出现本清单未记录的模型名（配置滞后以实际为准）→ 同上。
 - 能力异常（如图像输入突然报错）→ 探针实测复核。
 - **价格/折扣变动（促销开始/结束、模型到期下线）→ 增量更新成本列与角色分配；到期模型按回退备注切换。**
+- **切换环境（办公 ↔ 家用）→ 按「环境识别」节重新判定，改用对应环境节，禁止跨环境套用分配。**
+- **改过 `allowedModels` 等宿主配置 → 必须新开会话后重测路由**；当前会话受策略固化影响，改配置不会即时生效。
