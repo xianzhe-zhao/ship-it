@@ -1,5 +1,14 @@
 # Changelog — ship-it
 
+## 4.4.2（2026-11-17）
+
+**交付后体检修复**（体检脚本 + 人工复核；无新增 spec，按 mini-spec / 纯文档处理）：
+
+- **修 `build.ps1` 缺 UTF-8 BOM 的真 bug**：无 BOM 的 UTF-8 中文在 Windows PowerShell 5.1 下被按 ANSI 解码，`Parser::ParseFile` 报 **5 个语法错误**（L21 意外标记 `bytes`、L12 缺 `}`），`.\build.ps1` 在 PS 5.1 下**完全不可用**（本机默认 shell 即 5.1，`Get-Command pwsh` 不存在）。加 BOM 后 `PARSE_OK`，并**实跑成功**产出 `dist/ship-it.skill`（59410 bytes，skill 校验通过）。属**预存在缺陷**（脚本自 `000ef3e` 未改），非本次引入。
+- **README 补齐目标驱动编排**：团队模式节新增 bullet（启用时机 / 树结构 / 派发标识 / 核销目标树行 / 验收后关目标，含 v4.4.1 的 `paused` 与轮次口径）；文件结构 `team-mode.md` 描述补「目标驱动编排」。
+- **v4.4.0 spec §1 加指针注释**：说明 C5 已修订为「分母 Step 1–5 叶子」，避免读者按 §1 签约摘要的旧口径理解（不改历史条款正文）。
+- 版本 4.4.1 → 4.4.2（patch）。
+
 ## 4.4.1（2026-11-17）
 
 **契约补口：`paused` 语义 + 阻塞轮次口径**。v4.4.0 自举实跑暴露两处"只有名字、没有规则"的空白，本次按用户裁定补齐（spec：`docs/specs/2026-11-17-goal-orchestration-contract-gaps.md`）。

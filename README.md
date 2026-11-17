@@ -35,6 +35,7 @@
 - **角色**：需求澄清员 / 后端开发 / 前端开发 / 代码审查员（测试前四项审查）/ 测试员（持久 teammate，截图认证）/ 改动说明员
 - **模型分配能力+性价比驱动**：模型名只存在于项目 runbook 配置，skill 正文不写死；首次组队联网核实能力 + 探针；能力满足前提下按性价比（Credits 消耗/折扣窗口）排序，高并发/批量角色优先轻快模型
 - **审查闸门**：Step 3 与 4 之间，打回 ≤2 轮
+- **目标驱动编排**（v4.4.0+，可选）：签约时问用户是否启用「目标 + 任务树」；启用则建目标、按 Step 1–9 分组建树（叶子可检查、节点 ≤40）、派发带 `Timeline: tree=…; tasks=…` 标识与完成标准、进度写回树；Step 5 核销加「目标树 Step 1–5 100%」行；验收后关目标。`paused` 属未完成、核销前必须清零；「连续 3 轮」= 3 个自动续轮（v4.4.1 补口）
 - 详情见 `ship-it/references/team-mode.md`
 
 ## 文件结构
@@ -45,7 +46,7 @@ ship-it/
 ├── scripts/check_spec.py         # spec 机器校验（--stage spec|verify）
 └── references/
     ├── spec-template.md          # spec 模板（9 节，复制到项目 docs/specs/_TEMPLATE.md）
-    ├── team-mode.md              # 团队模式角色卡 + 派发协议 + 失败降级
+    ├── team-mode.md              # 团队模式角色卡 + 派发协议 + 目标驱动编排 + 失败降级
     ├── security-review.md        # 周期安全审查 playbook
     ├── self-check.md             # 编码自检：坐标断言 + 六项复查
     └── project-adaptation.md     # 首次接入项目：两层落地 + 核心功能清单

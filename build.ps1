@@ -1,4 +1,4 @@
-# 从源码构建 .skill 打包文件（输出到 dist\）
+﻿# 从源码构建 .skill 打包文件（输出到 dist\）
 # 用法: .\build.ps1
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $MyInvocation.MyCommand.Path
