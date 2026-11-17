@@ -1,6 +1,6 @@
 # deploy-runbook — ship-it 源码仓库
 
-> 本文件只放「本项目才知道的事」：环境值、模型能力清单与角色分配、部署/回退/验证、核心功能清单、安全审查周期、服务红线。**不复述通用 9 步流程**（流程见全局 skill `ship-it`）。
+> 本文件只放「本项目才知道的事」：环境值、模型能力清单（运行时派发参考）与默认路由、部署/回退/验证、核心功能清单、安全审查周期、服务红线。**不复述通用 9 步流程**（流程见全局 skill `ship-it`）。
 > 模型信息一律落在本文件（skill 正文不写死模型名）；同机新项目可直接复制「模型能力清单」节约定，不重复拉取。
 
 ## 系统形态与部署通道
@@ -33,9 +33,9 @@
 | 环境 | 识别依据 | 配置真源 | 备注 |
 |---|---|---|---|
 | **办公环境** | `USERDOMAIN=CORP`、存在公司 HTTP 代理（`HTTP_PROXY=http://109.2.0.41:9090`）、`COMPUTERNAME=XIANZHE-ZHAO01` | `~/.dsh/profiles/desktop/cordis.patch.yml` | 2026-11-17 实测 |
-| **家用环境** | 无 CORP 域、无公司代理 | 预期 `~/.dsh/profiles/<profile>/cordis.patch.yml`（**未实测**；C7 配置真源项待补全） | 下方家用节沿用 2026-11-16 记录，**本机未实测** |
+| **家用环境** | 无 CORP 域、无公司代理（实测：`USERDOMAIN=SENCER`、`COMPUTERNAME=SENCER`、无代理） | `~/.dsh/profiles/desktop/cordis.patch.yml`（2026-11-17 实测：`C:\Users\ASUS\.dsh\profiles\desktop\cordis.patch.yml`） | 已配置子集 2026-11-17 在本机实测（会话 `dsh-b6f0b86e-6954`），详见家用节 |
 
-> **识别顺序**：先看 `USERDOMAIN` 与代理环境变量；两者都不匹配 → 记「未知环境」，**只允许用会话默认模型**，并提示用户补充该环境配置，不得套用其他环境的分配。
+> **识别顺序**：先看 `USERDOMAIN` 与代理环境变量；两者都不匹配 → 记「未知环境」，**只允许用会话默认模型**，并提示用户补充该环境配置，不得套用其他环境的配置。
 > **会话策略固化（重要）**：DSH 的子代理白名单 `allowedModels` 在**会话创建时**写入会话事件流（`subagent/model-selection-policy`）并持久固化，改宿主配置只对**新开会话**生效。
 > 两类报错含义不同：`has no configured model` = 模型池里没有该 ID（改 ID）；`not allowed for this Session` = 会话白名单未放行（**新开会话**，不要反复改配置）。
 > 模型列表查询工具：`list_subagent_models`（传 provider + model 验证单条路由）。旧版文档所称 `~/.dsh/settings.yaml` 在新版 DSH 可能不存在。
@@ -67,31 +67,18 @@
 >
 > 三次 `list_subagent_models(provider=aipro, model=<ID>)` 均返回模型信息，未出现 `has no configured model` / `not allowed for this Session`。
 
-### 角色分配 · 办公环境
+### 默认路由 · 办公环境
 
-> 硬要求 > 软要求 > 性价比。测试员「必须图像输入」为硬要求 → **GLM-5.2-NVFP4 纯文本，不可当测试员**。
-> 主脑 = 会话模型（当前 `DeepSeek-V4.1-Flash-1017`），固定不分配；`spawn_teammate` 继承主脑模型，指定模型需经 `workflow` 的 `agent(prompt,{provider,model})`。
-
-| 角色 | 分配模型 | 理由（能力 + 成本） |
-|---|---|---|
-| 主脑 | `DeepSeek-V4.1-Flash-1017`（会话模型） | 1M 上下文 + 轻快档；主脑轮次最多、上下文最长，便宜大上下文最划算 |
-| 需求澄清员 | `DeepSeek-V4.1-Flash-1017` | 联网搜索由宿主工具提供；1M 利于大量资料归纳 |
-| 后端开发 | `DeepSeek-V4.1-Flash-1017` | 1M 大上下文 + 编码能力；与主脑同模型可复用上下文缓存 |
-| 前端开发 | `QWEN3.8-27B-FP8-256K` | 无特殊能力要求；256K 足够页面级改动，轻快省 Credits |
-| 代码审查员 | `GLM-5.2-NVFP4` | 512K 大上下文 + 强推理 + 可关思考；纯文本足够（审查读代码不读图） |
-| 测试员 | `QWEN3.8-27B-FP8-256K` | **图像输入 ✅（硬要求）**；256K 够截图认证；轻快 |
-| 改动说明员 | `QWEN3.8-27B-FP8-256K` | 无特殊能力要求；轻快 |
-
-> 三条路由已于 **2026-11-17 在会话 `dsh-1812d807-63a2` 实测放行**，上表分配可直接派发。
-> 换环境或改过 `allowedModels` 后仍受「会话策略固化」约束：**须新开会话重测三条路由**，未重测前按「不可派发」处理。
+> 宿主 `agent-default-model` = `DeepSeek-V4.1-Flash-1017`（1M 图文）。v4.5.0+ 派发默认宿主路由优先，**不维护角色分配表**；测试员图像硬能力由默认模型满足（✅ 图文），一般无需动态挑选；硬能力不满足或用户显式要求时查本会话放行集合动态选（见 skill team-mode「派发时模型决策」；`GLM-5.2-NVFP4` 纯文本，不得用于读图角色）。
+> 三条路由已于 **2026-11-17 在会话 `dsh-1812d807-63a2` 实测放行**；换环境或改过 `allowedModels` 后仍受「会话策略固化」约束：**须新开会话重测**，未重测前按「不可派发」处理。
 
 ---
 
-## 模型能力清单 · 家用环境（provider: `bailian-tpp` / Token Plan，记录于 2026-11-16，**本机未实测**）
+## 模型能力清单 · 家用环境（provider: `bailian-tpp` / Token Plan；目录记录于 2026-11-16，已配置子集 2026-11-17 本机实测）
 
-> 来源：Token Plan 可用文本模型目录 15 个（经 /models 端点 + 探针实测：64×64/128×128 PNG 图像输入、思考档位、function calling、多轮回传 + 官方文档核实）；DSH 宿主 `cordis.patch.yml` 当时配置其中 7 个。
-> ⚠️ **本节未经本机（办公环境）实测**，为家用环境历史记录；在家用机器上使用前，须按 C8 用 `list_subagent_models` 逐条验证并把结果写回本表。
-> ⚠️ **冻结状态（C7 不变式）**：下表模型 ID 沿用 2026-11-16 记录，其"小写无后缀"形式与办公环境已确认的别名问题（`glm-5.2` → 真 ID `GLM-5.2-NVFP4`）同构，**实测前一律视为疑似别名，不得作为角色分配依据**；角色分配只认「DSH 已配置 ✅ + 实测放行」双满足项。
+> 来源：Token Plan 可用文本模型目录 15 个（经 /models 端点 + 探针实测：64×64/128×128 PNG 图像输入、思考档位、function calling、多轮回传 + 官方文档核实）；DSH 宿主 `cordis.patch.yml` 当前配置其中 7 个。
+> ✅ **已配置子集本机实测（2026-11-17，家用机 SENCER，会话 `dsh-b6f0b86e-6954`）**：7 个已配置 ID 经 `list_subagent_models` 全部确认为真实 ID（5 条放行 + 2 条会话固化受限，见下方实测记录）；⬜ 8 个未配置模型仍未验证、视为疑似别名，不得用于派发。
+> ⚠️ **会话策略固化**：`qwen4-max-preview` / `qwen3.6-flash` 当前配置白名单已含，但本会话创建早于配置变更，报 `not allowed for this Session`——**非配置错误，新开会话应放行**，不反复改配置。
 
 | 模型 ID | 上下文大小 | 图像输入 | 单次请求图片上限 | 成本档位/折扣（可选） | 备注（擅长定位，联网核实） | DSH 已配置 |
 |---|---|---|---|---|---|---|
@@ -111,25 +98,29 @@
 | glm-5.3 | 1000000 | ❌ | 未知 | GLM 档 8/28，无折扣 | 漏洞挖掘/端到端工程交付，强制思考 low/high/max 三档（关思考会 400） | ✅ |
 | glm-5.2 | 1000000 | ❌ | 未知 | GLM 档 8/28，无折扣 | 企业级 Agent 默认长程任务，可关思考 high/max；与 5.3 同价但 5.3 更强 | ⬜ |
 
+> **实测记录（2026-11-17，会话 `dsh-b6f0b86e-6954`，家用机 SENCER；C8 证据）**：
+>
+> | 路由 | 结果 |
+> |---|---|
+> | `bailian-tpp/qwen3.8-max` | ✅ 放行 |
+> | `bailian-tpp/qwen3.8-flash` | ✅ 放行 |
+> | `bailian-tpp/qwen3.7-plus` | ✅ 放行 |
+> | `bailian-tpp/glm-5.3` | ✅ 放行 |
+> | `bailian-tpp/auto` | ✅ 放行 |
+> | `bailian-tpp/qwen4-max-preview` | ⚠️ 会话固化受限（当前白名单已含，新会话应放行） |
+> | `bailian-tpp/qwen3.6-flash` | ⚠️ 会话固化受限（同上） |
+> | `deepseek-account/deepseek-v4-pro` | ✅ 放行（DeepSeek Account provider，不在 Token Plan 目录内） |
+> | `deepseek-account/deepseek-flash` | ✅ 放行（返回模型为 DeepSeek-V4.1-Flash） |
+>
+> 5 条 `list_subagent_models(provider=bailian-tpp, model=<ID>)` 返回模型信息；2 条受限报 `not allowed for this Session`（会话级，非模型池缺失）。deepseek-account 两条为本次实测补记（此前 runbook 未记录，命中复核触发）。
+
 > 成本档位数字为**按量计费目录价（元/百万 token，输入/输出）**，仅作相对贵贱排序代理；Token Plan 实际按 **Credits 动态计费**（无固定 token 换算，由模型档位/token 量/思考模式/工具调用决定），真实消耗以控制台订阅页用量详情为准。
-> 另有 `decision-model-preview`（限时免费，0 Credits）为**决策模型**（分类/打分，非通用聊天），不在本 15 模型分配清单内；高频分诊可单独接入。
+> 另有 `decision-model-preview`（限时免费，0 Credits）为**决策模型**（分类/打分，非通用聊天），不在本 15 模型能力清单内；高频分诊可单独接入。
 
-### 角色分配 · 家用环境
+### 默认路由 · 家用环境
 
-> 硬要求 > 软要求 > 性价比。测试员「必须图像输入」为硬要求，成本不得覆盖。主脑=会话模型固定，不分配。
-> DSH 映射注意：`spawn_teammate` **继承主脑会话模型**（无模型参数）；本表为配置级意图，指定模型需经 `workflow` 的 `agent(prompt,{provider,model})` 或切换会话模型。
-> **角色分配只使用「DSH 已配置 ✅」模型**；⬜ 未配置模型需先在宿主 cordis.patch.yml 配置方可分配。该环境当时已配置 7 个：auto, qwen4-max-preview, qwen3.8-max, qwen3.8-flash, qwen3.7-plus, qwen3.6-flash, glm-5.3。
-> ⚠️ 本表沿用 2026-11-16 记录，**未经本机（办公环境）实测**；在家用机器上启用前须逐条 `list_subagent_models` 验证。
-
-| 角色 | 分配模型 | 理由（能力 + 成本） |
-|---|---|---|
-| 主脑 | 会话模型（该环境默认） | 固定，不分配 |
-| 需求澄清员 | qwen3.8-flash | 联网搜索由宿主工具提供；轻快性价比 |
-| 后端开发 | qwen4-max-preview | 1M 大上下文+旗舰编码+预览 2 折；**11-25 后回退 qwen4-max / qwen3.8-max** |
-| 前端开发 | qwen3.8-flash | 无特殊能力要求；轻快，夜间 4 折 |
-| 代码审查员 | glm-5.3 | 1M 大上下文+强推理+工程交付/漏洞挖掘定位契合审查；强制思考利于彻底审查；durable 不随预览到期（预览期求更省可换 qwen4-max-preview 2 折） |
-| 测试员 | qwen3.8-max | **图像输入 ✅（硬要求）**+1M；夜间 4 折；durable 不随预览到期 |
-| 改动说明员 | qwen3.8-flash | 无特殊能力要求；轻快 |
+> 宿主 `agent-default-model` = `bailian-tpp/qwen4-max-preview`（1M 图文；**2026-11-25 到期下线**，届时宿主配置回退，回退模型见价位折扣节）。v4.5.0+ 派发默认宿主路由优先，**不维护角色分配表**；测试员图像硬能力由默认模型满足（✅ 图文）；硬能力不满足或用户显式要求（如省钱）时查本会话放行集合动态选（见 skill team-mode「派发时模型决策」；性价比参考：轻快任务 qwen3.8-flash 夜间 4 折、审查 glm-5.3、读图 qwen3.8-max）。
+> ⚠️ 本会话（`dsh-b6f0b86e-6954`）qwen4-max-preview / qwen3.6-flash 会话固化受限：子代理显式指定这两条路由会被拒，动态挑选应选其他放行模型（如 qwen3.8-max / qwen3.8-flash），或新开会话；默认路由派发以宿主路由为准，若被拒按 skill「派发时模型决策」自动回退。
 
 ### 价位与折扣（时效信息，含到期回退）
 
@@ -137,7 +128,7 @@
   - 4 折：qwen3.8-max、qwen3.8-flash。
   - 5 折：deepseek-v4-pro-0813、deepseek-v4-flash-0731、deepseek-v4.1-flash、deepseek-v4.1-flash-1017。
 - **qwen4-max-preview 预览促销**：2026-11-11 10:00 ~ **2026-11-25 24:00**（UTC+8），Credits 消耗低至标准费率 **2 折**；夜间 22:00–08:00 再享 4 折 = 标准费率 **8%（0.8 折）**。同等 Credits 白天跑 5 倍用量、夜间跑 12.5 倍用量。
-  - **到期回退**：预览结束即下线。届时把后端开发等分配从 qwen4-max-preview 切到 **qwen4-max**（稳定 ID，标准费率）或 **qwen3.8-max**（夜间 4 折更省），并删除/更新本清单 preview 行。不得继续分配已下线模型。
+  - **到期回退**：预览结束即下线。届时宿主默认路由与动态挑选候选从 qwen4-max-preview 切到 **qwen4-max**（稳定 ID，标准费率）或 **qwen3.8-max**（夜间 4 折更省），并删除/更新本清单 preview 行。运行时派发不得继续使用已下线模型（自动回退）。
 - **decision-model-preview**：限时免费（0 Credits），决策接口非聊天。
 - 来源：[Token Plan 产品动态](https://www.alibabacloud.com/help/zh/model-studio/token-plan-product-updates)（2026-11-13）、[个人版概述](https://help.aliyun.com/zh/model-studio/token-plan-personal-overview)。折扣以控制台最新为准。
 
@@ -194,9 +185,10 @@ python ship-it\scripts\check_spec.py docs\specs\<文件> --stage verify
 
 ## 复核触发（增量，不为每个需求重复拉取）
 
-- 模型列表变动（新增/移除/改名）→ 对新模型联网核实能力 + 探针 → 重分配写回本文件。
+- 模型列表变动（新增/移除/改名）→ 对新模型联网核实能力 + 探针 → 更新能力清单写回本文件（运行时派发自动适应，无需人工改分配表）。
 - 会话实际路由出现本清单未记录的模型名（配置滞后以实际为准）→ 同上。
 - 能力异常（如图像输入突然报错）→ 探针实测复核。
-- **价格/折扣变动（促销开始/结束、模型到期下线）→ 增量更新成本列与角色分配；到期模型按回退备注切换。**
-- **切换环境（办公 ↔ 家用）→ 按「环境识别」节重新判定，改用对应环境节，禁止跨环境套用分配。**
+- **价格/折扣变动（促销开始/结束、模型到期下线）→ 增量更新成本列；到期模型注明回退，运行时派发不得使用已下线模型。**
+- **宿主默认路由变动（`agent-default-model` / 会话模型切换）→ 更新本文件各环境「默认路由」记录。**
+- **切换环境（办公 ↔ 家用）→ 按「环境识别」节重新判定，改用对应环境节，禁止跨环境套用配置。**
 - **改过 `allowedModels` 等宿主配置 → 必须新开会话后重测路由**；当前会话受策略固化影响，改配置不会即时生效。
