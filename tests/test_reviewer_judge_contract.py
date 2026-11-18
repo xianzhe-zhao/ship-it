@@ -390,6 +390,9 @@ class ReviewerJudgeContractTest(unittest.TestCase):
             self.assertIn(kw, self.team)
         self.assertIn("C23", self.spec)
         self.assertIn("A22", self.spec)
+        self.assertIn("本次 dogfood 复盘", self.team)
+        self.assertIn("逐文件小 commit push", self.team)
+        self.assertIn("§9 在 tester/security 报告前预填", self.team)
 
     # 主脑是唯一用户对接人 / 不亲自开发测试审代码 / 5 分钟心跳
     def test_c10_main_brain_aggregator(self) -> None:
