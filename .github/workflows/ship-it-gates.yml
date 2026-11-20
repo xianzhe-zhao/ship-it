@@ -1,0 +1,78 @@
+name: ship-it gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  spec-first:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve base
+        id: base
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: check_spec --git-check (changed specs)
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-logs
+          BASE="${{ steps.base.outputs.sha }}"
+          CHANGED="$(git diff --name-only "$BASE"...HEAD -- 'docs/specs/*.md' || true)"
+          if [ -z "$CHANGED" ]; then
+            echo "no changed spec; skip check_spec" | tee ci-logs/check_spec.log
+            exit 0
+          fi
+          for spec in $CHANGED; do
+            echo "== $spec (base=$BASE)" | tee -a ci-logs/check_spec.log
+            python ship-it/scripts/check_spec.py "$spec" --stage spec --git-check --base "$BASE" 2>&1 | tee -a ci-logs/check_spec.log
+          done
+
+      - name: check_text
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-logs
+          python ship-it/scripts/check_text.py --root . --allow-missing-git-push 2>&1 | tee ci-logs/check_text.log
+
+      - name: check_docs
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-logs
+          python ship-it/scripts/check_docs.py --root . 2>&1 | tee ci-logs/check_docs.log
+
+      - name: tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-logs
+          python -m tests.run_suite 2>&1 | tee ci-logs/tests.log
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ship-it-gate-evidence
+          path: ci-logs/
+          if-no-files-found: warn
