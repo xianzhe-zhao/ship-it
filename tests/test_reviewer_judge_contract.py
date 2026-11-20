@@ -118,7 +118,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
 
     # C5 主脑决策集与重派/续派规则
     def test_c5_main_decision_set(self) -> None:
-        for kw in ("换模型重派", "换 prompt / 缩范围重派", "基于已有产出续派剩余部分", "主脑自做", "报用户"):
+        for kw in ("换模型重派", "换 prompt / 缩范围重派", "基于已有产出续派剩余部分", "主脑不得自做", "报用户"):
             self.assertIn(kw, self.team)
         self.assertIn("派发失败", self.team)
         self.assertIn("执行失败", self.team)
@@ -161,12 +161,13 @@ class ReviewerJudgeContractTest(unittest.TestCase):
         self.assertIn("check_spec.py", self.skill)
         self.assertIn("主脑汇总团队产出", self.team + self.skill)
 
-    # C11 文档同步、版本 4.6.0 与 skill 正文零模型名
+    # C11 文档同步、版本 4.7.0 与 skill 正文零模型名
+    # C12/A12：v4.7.0 三处版本同步（4.6.0 → 4.7.0）
     def test_c11_version_and_sync(self) -> None:
         meta = frontmatter(self.skill)
-        self.assertEqual(meta.get("version"), "4.6.0")
+        self.assertEqual(meta.get("version"), "4.7.1")
         for rel in ("CHANGELOG.md", "ship-it/CHANGELOG.md"):
-            self.assertIn("4.6.0", read(rel))
+            self.assertIn("4.7.1", read(rel))
         for kw in ("代码安全员", "审查员（异常与偷懒审查）", "裁判员"):
             self.assertIn(kw, self.readme)
         self.assertIn("监督规则源", self.runbook)
@@ -207,7 +208,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
 
     # C14 审查员主动巡视协议
     def test_c14_reviewer_patrol(self) -> None:
-        self.assertIn("每 1 分钟", self.team)
+        self.assertIn("间隔 1 分钟", self.team)
         self.assertIn("主动巡视", self.team)
         self.assertIn("主脑不持续轮询", self.team)
         self.assertIn("事件触发巡视", self.team)
