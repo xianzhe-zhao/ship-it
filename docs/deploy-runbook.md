@@ -8,15 +8,18 @@
 - **系统形态**：单系统。本仓库是 ship-it skill 的**源码仓库**，无独立 test/prod 服务器。
 - **部署通道**：手动/脚本（真源 junction 模式）。`install.ps1`/`install.sh` 给 `ship-it/` 在 `~/.agents/skills/` 建 junction/symlink；`update.ps1`/`update.sh` 执行 `git pull`；`build.ps1`/`build.sh` 打包 `.skill` 到 `dist/`（不入库）。
 - **生效时机**：改 `ship-it/` 下文件存盘即生效（DSH/Codex 实时重扫 `~/.agents/skills`）；skill 正文变更需**下一轮对话**重新加载才被模型读到。无 CI/CD 自动发布（仓库无 `.github/workflows`）。
-- **版本来源（唯一真源）**：`ship-it/SKILL.md` frontmatter `version` + `ship-it/CHANGELOG.md`（skill 版本）+ `CHANGELOG.md`（仓库分发记录）。三处必须一致。
+- **版本来源（唯一真源）**：`ship-it/SKILL.md` frontmatter `version` + `ship-it/CHANGELOG.md`（skill 版本）+ `CHANGELOG.md`（仓库分发记录）。三处必须一致，**当前 v4.7.0**。
 - **凭据纪律**：本文件及全仓库**不写任何密钥值**。办公环境 `aipro` 的凭据环境变量名为 `AIPRO_API_KEY`（值见 `~/.dsh/.credentials.yaml`，不入库）；家用环境 Token Plan 用 `BAILIAN_TPP_API_KEY`。
 
 ## 核心功能清单（分级回归依据，只读）
 
 1. `ship-it/SKILL.md` 可加载：frontmatter 合法、`version` 可解析。
-2. `ship-it/scripts/check_spec.py` 正确校验 spec：`--stage spec` / `--stage verify` 退出码符合预期。
-3. `ship-it/references/` 交叉引用完整：SKILL.md 引用的 reference 文件均存在。
-4. `install`/`update`/`build` 脚本语法可用（PowerShell/Bash 解析无错）。
+2. `ship-it/scripts/check_spec.py` 正确校验 spec：`--stage draft|spec|verify|accept` 四阶段退出码符合预期；旧 spec 按 legacy 放行。
+3. `ship-it/scripts/check_roles.py` 正确校验审查报告与开工/暂停闸门：`--stage start|pause|sign|verify|accept`；缺报告/缺 start artifact/start 晚于实现/缺 pause 记录/身份重复/越界/密钥模式 → 非零退出。
+4. `ship-it/scripts/check_docs.py` 正确体检全文：`--root .`；旧口径/过期计数/重复/超长/跨文件矛盾 → 非零退出；allowlist 内不报。
+5. `ship-it/scripts/guard_large_write.py` 正确保护大文件：`prepare|check|restore`；缩水/乱码/尾标丢失 → `check` 非零退出，`restore` 可恢复。
+6. `ship-it/references/` 交叉引用完整：SKILL.md 引用的 reference 文件（含 `rule-style.md`）均存在。
+7. `install`/`update`/`build` 脚本语法可用（PowerShell/Bash 解析无错）。
 
 > 触及上述任一项 → 核心功能回归；否则轻量冒烟。回归只读、不改业务数据、不发付费请求。
 
@@ -37,7 +40,7 @@
 
 > **识别顺序**：先看 `USERDOMAIN` 与代理环境变量；两者都不匹配 → 记「未知环境」，**只允许用会话默认模型**，并提示用户补充该环境配置，不得套用其他环境的配置。
 > **会话策略固化（重要）**：DSH 的子代理白名单 `allowedModels` 在**会话创建时**写入会话事件流（`subagent/model-selection-policy`）并持久固化，改宿主配置只对**新开会话**生效。
-> 两类报错含义不同：`has no configured model` = 模型池里没有该 ID（改 ID）；`not allowed for this Session` = 会话白名单未放行（**新开会话**，不要反复改配置）。
+> 报错口径：`has no configured model` = 模型池里没有该 ID（改 ID）；`not allowed for this Session` 表示会话白名单未放行（**新开会话**，不要反复改配置）。
 > 模型列表查询工具：`list_subagent_models`（传 provider + model 验证单条路由）。旧版文档所称 `~/.dsh/settings.yaml` 在新版 DSH 可能不存在。
 
 ---
@@ -160,8 +163,20 @@
 .\update.ps1             # git pull
 # 打包 .skill（不入库）
 .\build.ps1              # 输出 dist\
-# 核销机器校验
+# 核销/验收机器校验
 python ship-it\scripts\check_spec.py docs\specs\<文件> --stage verify
+python ship-it\scripts\check_roles.py --date <YYYY-MM-DD> --stage start
+python ship-it\scripts\check_roles.py --date <YYYY-MM-DD> --stage verify
+python ship-it\scripts\check_roles.py --date <YYYY-MM-DD> --stage pause --spec docs\specs\<文件>
+python ship-it\scripts\check_spec.py docs\specs\<文件> --stage accept --git-check --base <ref>
+python ship-it\scripts\check_roles.py --date <YYYY-MM-DD> --stage accept
+python ship-it\scripts\check_docs.py --root .
+# 大文件写保护
+python ship-it\scripts\guard_large_write.py prepare <file> --manifest <manifest.json>
+python ship-it\scripts\guard_large_write.py check <file> --manifest <manifest.json>
+# 核心回归（现有契约测试；Step 5 回填后加 SHIP_IT_VERIFY=1）
+python -m unittest tests.test_reviewer_judge_contract -v
+python -m py_compile ship-it\scripts\check_spec.py ship-it\scripts\check_roles.py ship-it\scripts\check_docs.py ship-it\scripts\guard_large_write.py
 ```
 
 - **验证**：改 skill 正文后，下一轮对话让模型重读 `SKILL.md` 报 version 自证；`Get-Content ~/.agents/skills/ship-it/SKILL.md -TotalCount 5 | Select-String version` 查生效版本。
@@ -183,7 +198,8 @@ python ship-it\scripts\check_spec.py docs\specs\<文件> --stage verify
 - 禁止 AI 合并 PR（PR 创建即停，合并按钮属用户）。
 - 测试只读、不发付费请求、不写业务数据；一次性脚本置 `tmp/`（已 gitignore），收尾清理。
 - 代码安全员/审查员/裁判员只读：不得改代码/spec/任务树；审查员只可直发 `continue`/`retry_same`；裁判员 BLOCK 由主脑整改，PASS 不替代用户验收与 `check_spec.py`。
-- 代码安全员/审查员/裁判员报告落 `tmp/` 或内联，Step 9 必删；报告只写证据（`path:line`/命令+退出码），不写凭据值。
+- 审查员写权限仅 7 类记录（`docs/reviews/<date>-` 下 patrol/pause/auditor/failure-log/referee-start/security-start/auditor-start），其他文件不得写；start 文件由该角色本人写，主脑不得代写。
+- 审查报告落 `docs/reviews/` 或 `tmp/`；`tmp/` 报告 Step 9 必删；报告只写证据（`path:line`/命令+退出码），不写凭据值。
 
 ## 监督规则源（裁判员用，v4.6.0+）
 
@@ -194,18 +210,22 @@ python ship-it\scripts\check_spec.py docs\specs\<文件> --stage verify
 3. 全局：`~/.dsh/AGENTS.md`。
 4. skill 正文：`ship-it/SKILL.md`、`ship-it/references/team-mode.md`。
 5. spec 契约：`docs/specs/<本次>.md`（C 条款 / A 验收 / §7 边界 / §9 核销）。
-6. 任务树 / 共享看板快照（子代理无 timeline 工具时由主脑内联）。
+6. 任务树 / 共享看板快照（子代理无 timeline 工具时由主脑把快照写入 prompt）。
 7. agent 目录：本机 `~/.dsh` 下**无** `agents/`；`~/.agents/skills/` 是 skill 目录而非 agent 预设；按宿主实际存在路径读取，不存在记「未找到」。
 8. 禁止读取主脑会话日志 / `.jsonl.zstd` / 凭据值；后台不可见时写「后台可见性：降级」。
-9. C14 审查员巡视：默认每 1 分钟巡视所有成员（含主脑/裁判员）；宿主不支持定时 → 事件触发巡视并声明「无主动定时巡视」；主脑不持续轮询，但 5 分钟无审查员消息主动询问/唤醒。
-10. C15 裁判员不执行测试、不审代码：测试执行归测试员；代码审查+安全检查归代码安全员；J2 只审流程/文档/自检；J3/J4 在测试+审查/安全通过后根据测试员报告与代码安全员结论审契约。
-11. C17 代码安全员安全审查库：`references/security-kb.md`；OSV/GHSA/NVD/KEV/EPSS/EOL + SonarQube 可选 + Semgrep/Trivy/gitleaks；记录来源+日期，不凭记忆说最新。
-12. C16 信息流：用户 ↔ 主脑 ↔ 审查员 ↔（代码安全员/裁判员/开发/测试员）；主脑不直接等裁判员。
-13. C18 执行中需求变更/重签约：主脑先回复→审查员暂停子智能体并盘点→改 spec→用户重新签约→受影响闸门重跑；暂停期间不跑旧契约。
-14. C19 角色边界：代码安全员代码审查（正确性/质量/注释/重复功能）+ 安全检查；测试员只做验收测试；前端 design.md（无则先问/用户经验总结），后端+数据库标准；形态 1–3 测试员必执行。
-15. C20 图像/测试环境：审查员图像优先，图片交主脑决定临时识图子智能体；测试员用实际可控 Win/mac 工具，浏览器真实操作+截图，Playwright 提前适配。
-16. C21 契约互审：需求模糊/跳过澄清员时主脑+审查员+裁判员至少 1 轮互审；审查员汇总前对每个子代理报告至少反问 1 个问题；主脑可反向质疑，未解决不呈现。
-17. C23 审查员生命周期：签约到 PR/Step 9 不得结束；inactive 不是结束；主脑必须唤醒；下游无任务才可结束；换新审查员是角色替换，不是结束角色。
+9. C14 审查员开工闸门：第一个写任务前派发并落盘 patrol log（首轮早于首个实现提交、轮次 ≥3、间隔 ≤5 分钟或事件触发并记 trigger）；审查员只读但可写 7 类记录；`check_roles.py --stage start` 退出码 0 才开工；主脑不得代写或内联替代。
+10. C15 角色 start/report 双闸门：三份 start artifact（referee/security/auditor）由本人写，字段 role/reviewer/session/started_at/spec_revision/spec_hash/未参与编码声明/未参与 spec 编写声明；started_at 早于首个实现提交；三类身份互异。
+11. C16 契约变更暂停：用户改契约 → spec 置 status: paused；审查员向活跃子代理发暂停/结束令（主脑只下达意图）；pause 记录先于 spec 编辑；`check_roles.py --stage pause --spec` 退出码 0；重新签约后恢复。
+12. C17 失败分类与三次尝试：dispatch_failed 1 次后换新子智能体；execution_failed 3 次后换新子智能体；主脑不得自做；仍失败报用户；failure log 记 attempt。
+13. C18 全文一致性：`check_docs.py --root .` 退出码 0；旧口径/过期计数/重复/超长/跨文件矛盾清零。
+14. 裁判边界：不执行测试、不审代码；测试执行归测试员；代码审查+安全检查归代码安全员；J2 只审流程/文档/自检；J3/J4 在测试+审查/安全通过后根据测试员报告与代码安全员结论审契约。
+15. 安全审查库：`references/security-kb.md`；OSV/GHSA/NVD/KEV/EPSS/EOL + SonarQube 可选 + Semgrep/Trivy/gitleaks；记录来源+日期，不凭记忆说最新。
+16. 信息流：用户 ↔ 主脑 ↔ 审查员 ↔（代码安全员/裁判员/开发/测试员）；主脑不直接等裁判员；主脑只接收审查员汇总。
+17. 角色边界：代码安全员代码审查（正确性/质量/注释/重复功能）+ 安全检查；测试员只做验收测试；前端 design.md（无则先问/用户经验总结），后端+数据库标准；形态 1–3 测试员必执行。
+18. 图像/测试环境：审查员图像优先，图片交主脑决定临时识图子智能体；测试员用实际可控 Win/mac 工具，浏览器真实操作+截图，Playwright 提前适配。
+19. 契约互审：需求模糊/跳过澄清员时主脑+审查员+裁判员至少 1 轮互审；审查员汇总前对每个子代理报告至少反问 1 个问题；主脑可反向质疑，未解决不呈现。
+20. 审查员生命周期：签约到 PR/Step 9 不得结束；inactive 不是结束；主脑必须唤醒；下游无任务才可结束；换新审查员是角色替换，不是结束角色。
+21. v4.7.0 契约闸门总览：签约只认严格“签约”、验收只认严格“验收”；`check_spec.py` 四阶段（draft/spec/verify/accept）；`check_roles.py` 五阶段（start/pause/sign/verify/accept）与报告 C5 字段；`check_docs.py` 全文一致性；`guard_large_write.py` 大文件基线校验；入口清单逐条跳转；SKIP 必须退出码 2。
 
 ## 复核触发（增量，不为每个需求重复拉取）
 
