@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v5.0.0 | 2026-11-23 | 角色清晰化与一致性（major，破坏性：角色改名）：审查员→监察员、需求澄清员→需求分析师（正文范围替换，历史不改写）；8 角色卡加身份字段；前后矛盾检测机器化（check_text 区间通用化、check_docs 跨文件角色硬属性一致性、新建 role-glossary.md + check_terms.py）；模糊判据机器化（方案自审补放弃什么、契约互审列最危险 1-3 假设、spec 模板补好坏条款示例、Step 1 四零件检查单、issue 分类型、变更防膨胀一问、架构规则测试按项目选用、description 瘦身）；执行模式由用户裁定（单干/团队，AI 不得自选）；主脑回复用户四段式格式；最终交付检查总纲；需求分析师 grill-me 四机制。spec：docs/specs/2026-11-23-v5.0.0-role-clarity-consistency.md。major。 |
 | v4.7.2 | 2026-11-20 | 遗留问题修复：run_suite --out 根校验、failure log 密钥扫描、hook/check_text 路径根校验、CI action pin、default_base 删除（--base HEAD）、guard manifest HMAC、reviewer 派发/汇总字段、角色复用、Step 9 清理。patch。 |
 | v4.7.1 | 2026-11-20 | 文本质量与边界：ship-it SKILL ≤350 行、复盘 ≤150 行；Step 7 远端写前读上传工具/验分支，PR 仅在验收后、合并仅用户；新增 check_text 文本闸门；C6 首写标记、C7 暂停前 spec 快照、C8 按 hash_scope 校验历史 hash、C10 pre-commit + CI 留证、C11 审查员 last_active_at、C12 汇总来源路径校验。patch。 |
 | v4.7.0 | 2026-11-19 | 契约闸门与文本精简：签约/验收只认严格“签约”“验收”；check_spec 四阶段（draft/spec/verify/accept）+5 列核销；check_roles 五阶段（start/pause/sign/verify/accept）+start artifact；check_docs 全文一致性；审查员只读可写 7 类记录；契约变更先暂停；失败分类三次尝试。minor。 |
