@@ -67,7 +67,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p ci-logs
-          python -m tests.run_suite --jobs 1 2>&1 | tee ci-logs/tests.log
+          python -m tests.run_suite 2>&1 | tee ci-logs/tests.log
 
       - name: Upload gate evidence
         if: always()
