@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""v4.6.0 契约测试：代码安全员 / 审查员 / 裁判员 / 角色按需启用矩阵 / 主动巡视。
+"""v4.6.0 契约测试：代码安全员 / 监察员 / 裁判员 / 角色按需启用矩阵 / 主动巡视。
 
 测试从 spec 派生，不从实现派生：
   docs/specs/2026-11-18-reviewer-judge-roles.md（C1–C23 / A1–A22）
@@ -66,16 +66,16 @@ class ReviewerJudgeContractTest(unittest.TestCase):
 
     # C1 角色分工、改名与删除改动说明员
     def test_c1_role_division(self) -> None:
-        for role in ("代码安全员", "审查员（异常与偷懒审查）", "裁判员", "测试员"):
+        for role in ("代码安全员", "监察员（异常与偷懒审查）", "裁判员", "测试员"):
             self.assertIn(role, self.team)
         self.assertIn("代码安全员", self.skill)
-        self.assertIn("审查员（异常与偷懒审查）", self.skill)
+        self.assertIn("监察员（异常与偷懒审查）", self.skill)
         self.assertIn("改动说明员已删除", self.skill + self.readme)
         self.assertNotIn("### 改动说明员", self.team)
         self.assertNotIn("| 改动说明员 |", self.team)
         self.assertNotIn("### 代码审查员", self.team)
         cards = re.findall(
-            r"^### (主脑（会话本身）|需求澄清员|后端开发|前端开发|代码安全员|审查员（异常与偷懒审查）|裁判员|测试员)$",
+            r"^### (主脑（会话本身）|需求分析师|后端开发|前端开发|代码安全员|监察员（异常与偷懒审查）|裁判员|测试员)$",
             self.team,
             re.MULTILINE,
         )
@@ -83,7 +83,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
         self.assertIn("安全相关重复接口", self.team)
         self.assertIn("团队模式必执行", self.team)
 
-    # C2 审查员触发条件与失败分类
+    # C2 监察员触发条件与失败分类
     def test_c2_reviewer_trigger_classes(self) -> None:
         for cls in (
             "dispatch_failed",
@@ -100,16 +100,16 @@ class ReviewerJudgeContractTest(unittest.TestCase):
         self.assertIn("明显偷懒", self.team)
         self.assertIn("`failure_class` 为 9 个固定枚举", self.spec)
 
-    # C3 审查员输出、只读与指令边界
+    # C3 监察员输出、只读与指令边界
     def test_c3_reviewer_direct_order_boundary(self) -> None:
         self.assertIn("直接向子代理发 `continue` / `retry_same`", self.team)
-        self.assertIn("`continue` → 审查员直发", self.team)
+        self.assertIn("`continue` → 监察员直发", self.team)
         self.assertIn("`continue` → 审查员直发", self.spec)
         self.assertIn("换模型 / 换 prompt / 缩范围 / 新派发 / 续派剩余部分交主脑", self.team)
         self.assertIn("只审不裁", self.team)
         self.assertIn("只读", self.team)
 
-    # C4 审查员升级阈值与尝试计数
+    # C4 监察员升级阈值与尝试计数
     def test_c4_escalation_threshold(self) -> None:
         self.assertIn("初次 + 最多 2 次重试 = 共 3 次尝试", self.team)
         self.assertIn("第 3 次失败", self.team)
@@ -165,10 +165,10 @@ class ReviewerJudgeContractTest(unittest.TestCase):
     # C12/A12：v4.7.0 三处版本同步（4.6.0 → 4.7.0）
     def test_c11_version_and_sync(self) -> None:
         meta = frontmatter(self.skill)
-        self.assertEqual(meta.get("version"), "4.7.2")
+        self.assertEqual(meta.get("version"), "5.0.0")
         for rel in ("CHANGELOG.md", "ship-it/CHANGELOG.md"):
-            self.assertIn("4.7.2", read(rel))
-        for kw in ("代码安全员", "审查员（异常与偷懒审查）", "裁判员"):
+            self.assertIn("5.0.0", read(rel))
+        for kw in ("代码安全员", "监察员（异常与偷懒审查）", "裁判员"):
             self.assertIn(kw, self.readme)
         self.assertIn("监督规则源", self.runbook)
         self.assertIn("用户约束（裁判员规则源）", self.template)
@@ -184,7 +184,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
 
     # C12 降级与关闭开关
     def test_c12_degrade_switch(self) -> None:
-        self.assertIn("审查员（异常与偷懒审查）派发失败/超时", self.team)
+        self.assertIn("监察员（异常与偷懒审查）派发失败/超时", self.team)
         self.assertIn("不得自判 PASS", self.team)
         self.assertIn("单干 / mini-spec", self.team)
         self.assertIn("4.5.0", self.team)
@@ -194,8 +194,8 @@ class ReviewerJudgeContractTest(unittest.TestCase):
         for form in ("0 单干", "1 小改", "2 中改", "3 大改/高风险"):
             self.assertIn(form, self.team)
         self.assertIn("全部 8 角色", self.team)
-        self.assertIn("代码安全员、审查员、裁判员", self.team)
-        self.assertIn("**需求澄清员**：按需", self.team)
+        self.assertIn("代码安全员、监察员、裁判员", self.team)
+        self.assertIn("**需求分析师**：按需", self.team)
         self.assertIn("**测试员**：团队模式形态 1–3 必执行", self.team)
         self.assertIn("**前后端开发**：只派相关侧", self.team)
         self.assertIn("深度安全审计", self.team)
@@ -204,9 +204,9 @@ class ReviewerJudgeContractTest(unittest.TestCase):
         cells = [c.strip() for c in form1.strip().strip("|").split("|")]
         self.assertIn("裁判员", cells[2], f"形态 1 必派列缺裁判员：{cells}")
         # Step 1 澄清员必须写「按需」
-        self.assertIn("**按需**派**需求澄清员**", self.skill)
+        self.assertIn("**按需**派**需求分析师**", self.skill)
 
-    # C14 审查员主动巡视协议
+    # C14 监察员主动巡视协议
     def test_c14_reviewer_patrol(self) -> None:
         self.assertIn("间隔 1 分钟", self.team)
         self.assertIn("主动巡视", self.team)
@@ -216,9 +216,9 @@ class ReviewerJudgeContractTest(unittest.TestCase):
         self.assertIn("裁判员", self.team)
         self.assertIn("running / inactive / corrupt / unsupported / unavailable", self.team)
         self.assertIn("主脑证据包/看板快照", self.team)
-        self.assertIn("5 分钟无审查员消息", self.team)
+        self.assertIn("5 分钟无监察员消息", self.team)
         self.assertIn("再次上报/唤醒主脑", self.team)
-        self.assertIn("等待前先激活审查员", self.team)
+        self.assertIn("等待前先激活监察员", self.team)
         self.assertIn("每 5 分钟向用户发状态", self.team)
         self.assertIn("等待工具单次 ≤5 分钟", self.team)
         self.assertIn("超时先发状态", self.team)
@@ -242,7 +242,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
     # C16 信息流与循环升级顺序
     def test_c16_information_flow(self) -> None:
         for kw in (
-            "用户 ↔ 主脑 ↔ 审查员",
+            "用户 ↔ 主脑 ↔ 监察员",
             "主脑不直接等裁判员",
             "主脑唯一汇总接口",
             "测试员做验收测试",
@@ -331,7 +331,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
         self.assertNotIn("由测试员测试后审查", docs)
         self.assertIn("只做验收测试", self.skill)
 
-    # C20 审查员图像审查与测试执行环境
+    # C20 监察员图像审查与测试执行环境
     def test_c20_image_and_test_environment(self) -> None:
         for kw in (
             "图像审查",
@@ -376,7 +376,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
         self.assertIn("C22", self.spec)
         self.assertIn("A21", self.spec)
 
-    # C23 审查员生命周期
+    # C23 监察员生命周期
     def test_c23_reviewer_lifecycle(self) -> None:
         for kw in (
             "契约生命周期",
@@ -385,7 +385,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
             "下游",
             "PR 创建/Step 9 完成",
             "下游无任务",
-            "换新审查员",
+            "换新监察员",
             "角色替换",
         ):
             self.assertIn(kw, self.team)
@@ -397,7 +397,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
 
     # 主脑是唯一用户对接人 / 不亲自开发测试审代码 / 5 分钟心跳
     def test_c10_main_brain_aggregator(self) -> None:
-        for kw in ("唯一对用户交付", "不亲自开发/测试/审代码", "5 分钟无审查员消息"):
+        for kw in ("唯一对用户交付", "不亲自开发/测试/审代码", "5 分钟无监察员消息"):
             self.assertIn(kw, self.team)
         self.assertIn("用户唯一对接人", self.skill)
 

@@ -197,8 +197,8 @@ python -m py_compile ship-it\scripts\check_spec.py ship-it\scripts\check_roles.p
 - 禁止在 SKILL.md / team-mode.md / 任何 skill 正文或代码写死具体模型名（模型信息只在本 runbook）。
 - 禁止 AI 合并 PR（PR 创建即停，合并按钮属用户）。
 - 测试只读、不发付费请求、不写业务数据；一次性脚本置 `tmp/`（已 gitignore），收尾清理。
-- 代码安全员/审查员/裁判员只读：不得改代码/spec/任务树；审查员只可直发 `continue`/`retry_same`；裁判员 BLOCK 由主脑整改，PASS 不替代用户验收与 `check_spec.py`。
-- 审查员写权限仅 7 类记录（`docs/reviews/<date>-` 下 patrol/pause/auditor/failure-log/referee-start/security-start/auditor-start），其他文件不得写；start 文件由该角色本人写，主脑不得代写。
+- 代码安全员/监察员/裁判员只读：不得改代码/spec/任务树；监察员只可直发 `continue`/`retry_same`；裁判员 BLOCK 由主脑整改，PASS 不替代用户验收与 `check_spec.py`。
+- 监察员写权限仅 7 类记录（`docs/reviews/<date>-` 下 patrol/pause/auditor/failure-log/referee-start/security-start/auditor-start），其他文件不得写；start 文件由该角色本人写，主脑不得代写。
 - 审查报告落 `docs/reviews/` 或 `tmp/`；`tmp/` 报告 Step 9 必删；报告只写证据（`path:line`/命令+退出码），不写凭据值。
 
 ## 监督规则源（裁判员用，v4.6.0+）
@@ -213,18 +213,18 @@ python -m py_compile ship-it\scripts\check_spec.py ship-it\scripts\check_roles.p
 6. 任务树 / 共享看板快照（子代理无 timeline 工具时由主脑把快照写入 prompt）。
 7. agent 目录：本机 `~/.dsh` 下**无** `agents/`；`~/.agents/skills/` 是 skill 目录而非 agent 预设；按宿主实际存在路径读取，不存在记「未找到」。
 8. 禁止读取主脑会话日志 / `.jsonl.zstd` / 凭据值；后台不可见时写「后台可见性：降级」。
-9. C14 审查员开工闸门：第一个写任务前派发并落盘 patrol log（首轮早于首个实现提交、轮次 ≥3、间隔 ≤5 分钟或事件触发并记 trigger）；审查员只读但可写 7 类记录；`check_roles.py --stage start` 退出码 0 才开工；主脑不得代写或内联替代。
+9. C14 监察员开工闸门：第一个写任务前派发并落盘 patrol log（首轮早于首个实现提交、轮次 ≥3、间隔 ≤5 分钟或事件触发并记 trigger）；监察员只读但可写 7 类记录；`check_roles.py --stage start` 退出码 0 才开工；主脑不得代写或内联替代。
 10. C15 角色 start/report 双闸门：三份 start artifact（referee/security/auditor）由本人写，字段 role/reviewer/session/started_at/spec_revision/spec_hash/未参与编码声明/未参与 spec 编写声明；started_at 早于首个实现提交；三类身份互异。
-11. C16 契约变更暂停：用户改契约 → spec 置 status: paused；审查员向活跃子代理发暂停/结束令（主脑只下达意图）；pause 记录先于 spec 编辑；`check_roles.py --stage pause --spec` 退出码 0；重新签约后恢复。
+11. C16 契约变更暂停：用户改契约 → spec 置 status: paused；监察员向活跃子代理发暂停/结束令（主脑只下达意图）；pause 记录先于 spec 编辑；`check_roles.py --stage pause --spec` 退出码 0；重新签约后恢复。
 12. C17 失败分类与三次尝试：dispatch_failed 1 次后换新子智能体；execution_failed 3 次后换新子智能体；主脑不得自做；仍失败报用户；failure log 记 attempt。
 13. C18 全文一致性：`check_docs.py --root .` 退出码 0；旧口径/过期计数/重复/超长/跨文件矛盾清零。
 14. 裁判边界：不执行测试、不审代码；测试执行归测试员；代码审查+安全检查归代码安全员；J2 只审流程/文档/自检；J3/J4 在测试+审查/安全通过后根据测试员报告与代码安全员结论审契约。
 15. 安全审查库：`references/security-kb.md`；OSV/GHSA/NVD/KEV/EPSS/EOL + SonarQube 可选 + Semgrep/Trivy/gitleaks；记录来源+日期，不凭记忆说最新。
-16. 信息流：用户 ↔ 主脑 ↔ 审查员 ↔（代码安全员/裁判员/开发/测试员）；主脑不直接等裁判员；主脑只接收审查员汇总。
+16. 信息流：用户 ↔ 主脑 ↔ 监察员 ↔（代码安全员/裁判员/开发/测试员）；主脑不直接等裁判员；主脑只接收监察员汇总。
 17. 角色边界：代码安全员代码审查（正确性/质量/注释/重复功能）+ 安全检查；测试员只做验收测试；前端 design.md（无则先问/用户经验总结），后端+数据库标准；形态 1–3 测试员必执行。
-18. 图像/测试环境：审查员图像优先，图片交主脑决定临时识图子智能体；测试员用实际可控 Win/mac 工具，浏览器真实操作+截图，Playwright 提前适配。
-19. 契约互审：需求模糊/跳过澄清员时主脑+审查员+裁判员至少 1 轮互审；审查员汇总前对每个子代理报告至少反问 1 个问题；主脑可反向质疑，未解决不呈现。
-20. 审查员生命周期：签约到 PR/Step 9 不得结束；inactive 不是结束；主脑必须唤醒；下游无任务才可结束；换新审查员是角色替换，不是结束角色。
+18. 图像/测试环境：监察员图像优先，图片交主脑决定临时识图子智能体；测试员用实际可控 Win/mac 工具，浏览器真实操作+截图，Playwright 提前适配。
+19. 契约互审：需求模糊/跳过澄清员时主脑+监察员+裁判员至少 1 轮互审；监察员汇总前对每个子代理报告至少反问 1 个问题；主脑可反向质疑，未解决不呈现。
+20. 监察员生命周期：签约到 PR/Step 9 不得结束；inactive 不是结束；主脑必须唤醒；下游无任务才可结束；换新监察员是角色替换，不是结束角色。
 21. v4.7.0 契约闸门总览：签约只认严格“签约”、验收只认严格“验收”；`check_spec.py` 四阶段（draft/spec/verify/accept）；`check_roles.py` 五阶段（start/pause/sign/verify/accept）与报告 C5 字段；`check_docs.py` 全文一致性；`guard_large_write.py` 大文件基线校验；入口清单逐条跳转；SKIP 必须退出码 2。
 
 ## 复核触发（增量，不为每个需求重复拉取）
