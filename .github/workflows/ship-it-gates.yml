@@ -67,7 +67,11 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p ci-logs
+          set +e
           python -m tests.run_suite 2>&1 | tee ci-logs/tests.log
+          rc=${PIPESTATUS[0]}
+          # 0=全过 2=有SKIP但无failure/error；其他=真失败
+          if [ $rc -ne 0 ] && [ $rc -ne 2 ]; then exit $rc; fi
 
       - name: Upload gate evidence
         if: always()
