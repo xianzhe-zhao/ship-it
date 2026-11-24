@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""check_text.py — v4.7.1 文本质量闸门（C1–C4）：行数、禁词、重复标题、矛盾计数、互引、边界语。
+"""check_text.py — v5.1.0 文本质量闸门（C1–C4）：行数、禁词、重复标题、矛盾计数、互引、边界语。
 
 用法：
     python ship-it/scripts/check_text.py [--root .] [--git-push PATH] [--retro PATH] [--json]
@@ -141,7 +141,7 @@ def check_contradictions(ship_text: str, errors):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="v4.7.2 文本质量闸门（行数/禁词/重复/矛盾/互引/边界）")
+    parser = argparse.ArgumentParser(description="v5.1.0 文本质量闸门（行数/禁词/重复/矛盾/互引/边界）")
     parser.add_argument("--root", default=".")
     parser.add_argument("--git-push", help="显式上传 skill 路径；必须在 --root 内（默认全局 skill 为兼容例外）")
     parser.add_argument("--retro", help="复盘文件路径；必须在 --root 内")

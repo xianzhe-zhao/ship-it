@@ -83,6 +83,8 @@ def run_check(root: Path, gpf: Path, retro: Path):
     args = ["--root", str(root)]
     if Path(gpf).resolve().is_relative_to(root_real):
         args += ["--git-push", str(gpf)]
+    elif not Path(gpf).is_file():
+        args += ["--allow-missing-git-push"]
     args += ["--retro", str(retro)]
     return invoke_script(CHECK_TEXT, args, ROOT)
 
