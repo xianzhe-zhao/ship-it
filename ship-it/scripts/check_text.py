@@ -101,6 +101,14 @@ def check_file(label: str, path: Path, text: str, limit: int, banned, errors, wa
 
 
 def check_contradictions(ship_text: str, errors):
+    """C21（B7-G1）：通用条款区间校验。
+
+    解析 SKILL.md 全部 "C1-Cn"/"An-An" 区间（分隔可为 –/-/—/~/至/../…），
+    自动检测同文档内不一致区间：同一系列、同一左端、右端不同即矛盾。
+    原 3 组硬编码逻辑保留为子集（不删除），通用解析在其之上兜底。
+    仅检测同文档内区间，不跨文件。
+    """
+    # 原 3 组硬编码区间（保留为子集，确保旧行为不退化）。
     pairs = [
         (r"C1[–\-]C17", r"C1[–\-]C18", "C1–C17 与 C1–C18"),
         (r"A1[–\-]A18", r"A1[–\-]A19", "A1–A18 与 A1–A19"),
@@ -109,6 +117,27 @@ def check_contradictions(ship_text: str, errors):
     for left, right, label in pairs:
         if re.search(left, ship_text) and re.search(right, ship_text):
             errors.append("ship-it/SKILL.md 矛盾计数：%s" % label)
+
+    # 通用解析：抽取全部 C<a>-C<b> / A<a>-A<b> 区间，按 (系列, 左端) 分组比较右端。
+    interval_re = re.compile(
+        r"\b([CA])\s*(\d+)\s*(?:[–\-—～~]|\.\.|…)\s*\1\s*(\d+)\b"
+    )
+    by_key = {}
+    for match in interval_re.finditer(ship_text):
+        series, start, end = match.group(1), int(match.group(2)), int(match.group(3))
+        if end < start:
+            continue
+        by_key.setdefault((series, start), set()).add(end)
+    for (series, start), ends in sorted(by_key.items()):
+        if len(ends) > 1:
+            ends_sorted = sorted(ends)
+            label = "%s%d–%s%d 与 %s%d–%s%d" % (
+                series, start, series, ends_sorted[0],
+                series, start, series, ends_sorted[-1]
+            )
+            msg = "ship-it/SKILL.md 矛盾计数：%s" % label
+            if msg not in errors:
+                errors.append(msg)
 
 
 def main(argv=None):
