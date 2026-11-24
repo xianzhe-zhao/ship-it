@@ -2443,6 +2443,8 @@ class ProcessGatesContractTest(unittest.TestCase):
                              "C8：--head HEAD 与默认一致应 PASS")
 
         spec_rel = "docs/specs/2026-11-19-contract-gates-and-concision.md"
+        if os.environ.get("CI"):
+            self.skipTest("CI 环境历史 base commit 不可达（重建分支历史与 origin/main 不同），跳过历史 base 校验")
         for base in ("df96d34", "830d35f", "03faf7d", "54b1c61", "660a6be"):
             with self.subTest(base=base):
                 result = run_py(CHECK_SPEC, [spec_rel, "--stage", "spec", "--git-check", "--base", base], cwd=ROOT)
