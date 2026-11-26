@@ -128,8 +128,7 @@ accepted_items: ""
 - **后置条件**：
 - **失败行为**：
 - **不变式**：
-- **修订台账**：
-  - rev1（原始）：<本条原始内容> —— 签约时确立，authority: user
+- **修订台账**：（格式同 C1：rev1 原始 + 后续修订追加，原标准保留）
 
 > **C 条款 revision 规则**（C9）：每条 C 带 revision 版本号；改标准唯一合法途径是在台账追加一条（原标准保留），不得直接改弱。核销 ✅ 的条款 revision 必须与签约时一致，不一致须有台账，否则 `check_spec.py --stage verify` 退出码 1（fail closed）。🔒 条款改弱必须 authority=user。
 

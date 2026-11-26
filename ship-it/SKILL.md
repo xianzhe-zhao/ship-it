@@ -274,8 +274,8 @@ PR 说明四块缺一不可：①版本号 + 变更摘要；②spec 契约（文
 服务类安全规则：禁止 `pm2 kill` / `pm2 delete all` / `pm2 delete` 不带服务名；只操作具体服务名。操作前先 `pm2 list` 确认当前状态；重启后确认全部 online。前端部署“先清后放”（原子换目录），禁止在旧产物上覆盖。部署前确认目标路径（测试 vs 生产）并确认基线 commit 已合入 main。凭据（`.env` 值、口令、密钥）一律不写进文档、脚本、commit；需要时写“见服务器 `.env`”。耗时不能作为部署失败判据（跨境链路可能 10–60s）；看状态码 + 产物大小/hash 是否与本地一致；有内网/VPN 入口优先用它验证。
 
 ## Step 9：清理 + 变更记录
-
-1. 删远程/本地已合并分支：`git push origin --delete <branch>` / `git branch -d <branch>`。2. 垃圾零容忍：删除 `tmp/`、`.tmp/`、`.dsh-project-memory/`、`tests/__pycache__/`、`test/**/*.tmp`、`*.gz`；一次性测试脚本、诊断脚本、临时日志、截图、`.bak` 备份、guard manifest 全部清掉；`git status` 只剩有意提交的文件；确认 `.gitignore` 覆盖到位。**局部 Git 校验**（C12）：校验限缩到 spec §2「变更涉及的文件清单」——清单内的文件必须干净（已提交/已删），清单外的未提交改动只告警不阻塞（避免项目里本来就有别的未提交改动被误判为脏）。pre-commit hook 说明：`.git/hooks/pre-commit` 是本地门禁，不入库、不提交，Step 9 不删除。3. 写变更记录（`CHANGELOG.md` 顶部或项目既有 `deploy-log.md`）：版本、变更内容、测试环境验证、生产部署与验证。4. 同步受影响的文档（端口/表结构/接口/文件清单）。5. 向用户汇报：合并的 PR、版本号、生产状态、清理结果、请强刷提示。
+1. 删远程/本地已合并分支：`git push origin --delete <branch>` / `git branch -d <branch>`。2. 垃圾零容忍：删除 `tmp/`、`.tmp/`、`.dsh-project-memory/`、`tests/__pycache__/`、`test/**/*.tmp`、`*.gz`；一次性测试脚本、诊断脚本、临时日志、截图、`.bak` 备份、guard manifest 全部清掉；`git status` 只剩有意提交的文件；确认 `.gitignore` 覆盖到位。**局部 Git 校验**（C12）：校验限缩到 spec §2「变更涉及的文件清单」——清单内必须干净，清单外只告警不阻塞。pre-commit hook 说明：`.git/hooks/pre-commit` 是本地门禁，不入库、不提交，Step 9 不删除。
+3. 写变更记录（`CHANGELOG.md` 顶部或项目既有 `deploy-log.md`）：版本、变更内容、测试环境验证、生产部署与验证。4. 同步受影响的文档（端口/表结构/接口/文件清单）。5. 向用户汇报：合并的 PR、版本号、生产状态、清理结果、请强刷提示。
 
 ## 版本号规则
 
