@@ -140,6 +140,64 @@ def check_contradictions(ship_text: str, errors):
                 errors.append(msg)
 
 
+def check_doc_quality(texts, errors, warnings):
+    """C15：验收前文档质量检查——废话词/术语统一/跨文件分歧/前后矛盾。"""
+    # 1. 废话词（主观形容词无判定方式）
+    FLUFF_WORDS = ["更加", "更好地", "完善的", "合理的", "适当", "进一步", "尽可能", "尽量", "原则上", "一般来说", "基本上", "大致", "差不多"]
+    for label, text in texts.items():
+        for word in FLUFF_WORDS:
+            if word in text:
+                idx = text.index(word)
+                ctx = text[max(0, idx-15):idx+25].replace("\n", " ")
+                warnings.append("%s 含废话词'%s'：%s" % (label, word, ctx))
+
+    # 2. 跨文件术语统一：同一概念在不同 md 文件应用词一致
+    # 读所有 references/*.md
+    refs_dir = Path(__file__).resolve().parent.parent / "references"
+    ref_texts = {}
+    if refs_dir.is_dir():
+        for md in refs_dir.glob("*.md"):
+            ref_texts[md.name] = read_text(md)
+    ship = texts.get("ship-it/SKILL.md", "")
+
+    # 术语对：(应统一的用词A, 应统一的用词B)——同一概念不应两种写法并存于不同文件
+    TERM_PAIRS = [
+        ("五选一", "五轨道"),       # 变更轨道数量
+        ("五条轨道", "五轨道"),
+        # "咨询顾问模式" vs "咨询顾问" 非真分歧（子串），不检查
+        ("代码审查员", "代码安全员"),  # 角色名（应以代码安全员为准）
+        ("审查员", "监察员"),        # 角色名（应以监察员为准）
+        ("需求澄清员", "需求分析师"),  # 角色名（应以需求分析师为准）
+    ]
+    all_docs = dict(ref_texts)
+    all_docs.pop("role-glossary.md", None)
+    all_docs.pop("security-kb.md", None)  # 历史安全库用旧角色名
+    if ship:
+        all_docs["SKILL.md"] = ship
+    for a, b in TERM_PAIRS:
+        files_with_a = [name for name, t in all_docs.items() if a in t]
+        files_with_b = [name for name, t in all_docs.items() if b in t]
+        if files_with_a and files_with_b:
+            errors.append("术语分歧：'%s'（%s）与 '%s'（%s）在不同文件并存，应统一" %
+                          (a, ",".join(files_with_a), b, ",".join(files_with_b)))
+
+    # 3. 前后矛盾：同一文件内数值/计数前后不一致
+    # 检查"X 条 C"/"X 条优化"等计数在不同位置是否一致
+    import re as _re
+    for label, text in all_docs.items():
+        # 找所有"NN 条 C"/"NN 条优化"/"NN 个角色"等计数
+        count_patterns = [
+            (_re.compile(r"(\d+)\s*条\s*C"), "条 C"),
+            (_re.compile(r"(\d+)\s*条\s*优化"), "条优化"),
+            (_re.compile(r"(\d+)\s*个\s*角色"), "个角色"),
+            (_re.compile(r"(\d+)\s*条\s*轨道"), "条轨道"),
+        ]
+        for pat, unit in count_patterns:
+            nums = set(pat.findall(text))
+            if len(nums) > 1:
+                errors.append("%s 前后矛盾：'%s'计数不一致 %s" % (label, unit, "/".join(sorted(nums))))
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="v5.1.0 文本质量闸门（行数/禁词/重复/矛盾/互引/边界）")
     parser.add_argument("--root", default=".")
@@ -211,6 +269,7 @@ def main(argv=None):
         if phrase in git_text:
             errors.append("git-push-firewall/SKILL.md 含 PR/合并授权语：%s" % phrase)
     check_contradictions(ship_text, errors)
+    check_doc_quality(texts, errors, warnings)
 
     result = {"ok": not errors, "errors": errors, "warnings": warnings,
               "files": {str(path): len(text.splitlines()) for path, text in texts.items()},

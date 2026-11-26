@@ -1,5 +1,9 @@
 # Changelog — ship-it
 
+## 5.2.0（2026-11-26）
+
+**开发流程增强（minor，17 条优化）**：借鉴 omd/trellis/ship-it 三方对比，落地 17 条契约条款。核心：C1 5 变更轨道+步骤序列；C2 性能工程师（咨询顾问模式）；C3 前端演示页；C4 bug 复现契约；C5 check_writes_before_sign.py 事前拦截；C6 ast-grep/LSP 影响面；C7 代码安全员出有依据方案（P0 不对称否决）；C8 中途变更三分流+冻结+backlog；C9 criterion amendments（revision+台账防改弱）；C10 歧义度自评；C11 ai/human 核销；C12 局部 Git 校验；C13 降级系统化；C14 leaf-guard（DSH 建议启用）；C15 文档质量检查（机器+裁判员 J2）；C16 C8 机器闸门；C17 条款-实现一致性。spec：docs/specs/2026-11-25-v5.2.0-tracks-roles-degradation.md。minor。
+
 ## 5.1.0（2026-11-24）
 
 **自身一致性修复（minor，含结构优化）**：修 v5.0.0 升级遗留的 4 个真错误——①SKILL.md 正文两处「当前 v4.7.1」未同步到 5.0.0（现统一 5.1.0）；②文件地图漏列 v5.0.0 新产物 role-glossary.md / check_terms.py / watchdog_daemon.py / install-hooks.py / spec_hash.py（现补全）；③SKILL.md 正文未引用 v5.0.0 新产物（现文件地图补用途说明）；④check_text.py docstring(v4.7.1) 与 argparse(v4.7.2) 版本标识矛盾（现统一 5.1.0）。修 check_docs.py 默认选 spec 的 bug——原硬编码 DEFAULT_SPEC 优先导致默认跑用过期契约比对，改为选文件名版本号最高（SemVer），无版本号降级日期+mtime。spec：docs/specs/2026-11-24-v5.1.0-skill-self-consistency.md。minor。
