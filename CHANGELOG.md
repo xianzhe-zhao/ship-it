@@ -2,6 +2,10 @@
 
 > 本仓库的分发记录。skill 自身的版本变更见 [`ship-it/CHANGELOG.md`](ship-it/CHANGELOG.md)。
 
+## 5.2.0（2026-11-26）
+
+ship-it v5.2.0：开发流程增强，17 条优化（5 轨道/性能工程师/咨询顾问模式/事前拦截/criterion amendments/三分流/leaf-guard/文档质量检查/C8 机器闸门/条款-实现一致性）。详见 [`ship-it/CHANGELOG.md`](ship-it/CHANGELOG.md)。
+
 ## 版本索引
 
 | 版本 | 日期 | 变更 |

@@ -1,7 +1,7 @@
 ---
 name: ship-it
 description: "代码变更→测试→发布（契约模式），9 步不跳步：澄清→spec 签约→编码→测试→核销→验收→PR→发布→清理。用户提出需要修改代码并最终交付/发布的需求时启用。签约/验收分别只认只含“签约”“验收”两个字的用户消息；核销与全文一致性由机器校验。团队模式含代码安全员/监察员/裁判员。触发词：改代码、修 bug、加功能、重构、需求评审、安全审查、漏洞、写个 spec、契约、验收标准、写测试、回归测试、E2E、视觉自测、准备 PR、版本号、发布、上线、deploy、release。"
-version: 5.1.0
+version: 5.2.0
 ---
 
 # ship-it（开发发布工作流 · 契约模式）
@@ -30,8 +30,8 @@ version: 5.1.0
 ## 文件地图
 
 - `references/rule-style.md` 文本铁律与硬禁用词；`references/security-review.md` 周期安全审查 playbook；`references/security-kb.md` 代码安全员审查库。
-- `references/spec-template.md` spec 模板（签约/验收块、入口清单、P1..Pn、5 列核销）；`references/self-check.md` 自检与坐标断言；`references/project-adaptation.md` 项目接入；`references/team-mode.md` 团队角色与派发协议；`references/role-glossary.md` 角色术语表（v5.0.0 新建，角色名规范与别名映射）。
-- `scripts/check_spec.py` spec 四阶段（draft/spec/verify/accept）与 `--git-check`；`scripts/check_roles.py` 闸门（`--stage start|pause|sign|verify|accept`）；`scripts/check_docs.py` 全文一致性（默认选文件名版本号最高的 spec）；`scripts/check_text.py` 文本质量；`scripts/check_terms.py` 角色术语扫描（v5.0.0 新建）。
+- `references/spec-template.md` spec 模板（签约/验收块、入口清单、P1..Pn、5 列核销、5 变更轨道、C 条款 revision+修订台账、四零件清晰度自评、ai/human 验收方式）；`references/self-check.md` 自检与坐标断言；`references/project-adaptation.md` 项目接入；`references/team-mode.md` 团队角色与派发协议；`references/role-glossary.md` 角色术语表（v5.0.0 新建，角色名规范与别名映射）。
+- `scripts/check_spec.py` spec 四阶段（draft/spec/verify/accept）与 `--git-check`（v5.2.0 扩展 C9 条款 revision 校验）；`scripts/check_roles.py` 闸门（`--stage start|pause|sign|verify|accept`）；`scripts/check_docs.py` 全文一致性（默认选文件名版本号最高的 spec）；`scripts/check_text.py` 文本质量；`scripts/check_terms.py` 角色术语扫描（v5.0.0 新建）；`scripts/check_writes_before_sign.py` 规划期只读保护（v5.2.0 新建 C5，事前拦截签约前实现文件改动）。
 - `scripts/guard_large_write.py` 大文件写保护；`scripts/pre_commit_check.py` pre-commit（`check` / `install-hooks`，`--base` 默认 `HEAD`）；`scripts/install-hooks.py` 安装 git pre-commit hook；`scripts/spec_hash.py` spec 哈希计算；`scripts/watchdog_daemon.py` 监察员常驻守护（v5.0.0 新建 C34）。
 
 ## 何时使用 / 系统形态 / 部署通道
@@ -56,6 +56,7 @@ version: 5.1.0
 - **监督**：监察员间隔 1 分钟巡视所有成员（含主脑/裁判员/代码安全员/测试员/开发），patrol 落 `docs/reviews/<date>-auditor-patrol.md`（轮次/时间/成员/状态/证据/异常/动作；末轮必须写 `last_active_at`，且 ≥ max(first_write_at, test_run_finished)-5min，C11）；发现 inactive 未完成、主脑 idle 有剩余任务、running 无进展即催办/上报；可直发 `continue`/`retry_same`，换模型/换范围/新派发交主脑；宿主不支持持久定时 → 事件触发巡视（每轮记 trigger）并声明“无主动定时巡视”降级。
 - **心跳**：主脑不持续轮询；5 分钟无监察员消息 → 主动询问/唤醒；监察员 5 分钟无主脑确认 → 再次上报/唤醒；监察员汇总每个报告前必须分析并至少反问 1 个问题，主脑可反向质疑，未解决不呈现。
 - **写权限**：监察员只读，但可写 `docs/reviews/<date>-` 下 patrol/pause/auditor/failure-log/referee-start/security-start/auditor-start 7 类记录，其他文件不得写；patrol 原文不得篡改。
+- **leaf-guard 叶子代理工具隔离**（C14）：派发叶子代理（开发/测试员/代码安全员/性能工程师等执行角色）时机械隐藏编排类工具（派发子代理/调度其他角色/改契约状态），使其物理上无法自行调度或越权。**DSH 环境**建议用 `tools.restrict({ deny: [...] })`（核心能力，稳定）；**其他环境**降级为纪律层（角色只读声明 + 监察员巡视）并注明。监察员/裁判员/主脑不在此限。与 C5（文件锁）形成物理锁双保险。
 - **开工闸门**：第一个写任务前必须派发并落盘 patrol（首轮早于首个写任务、轮次 ≥3、间隔 ≤5 分钟或事前声明事件触发）；三份 start artifact（referee/security/auditor）由本人写；`check_roles --stage start` 必须为 0；C6 首写标记 `tmp/first-write.json` 的 `first_write_at` 必须晚于 start/patrol 启动时间；C11 在 start/verify/accept 校验 patrol 末轮 `last_active_at`。
 - **契约变更暂停**：用户要求改已签约 spec → 主脑先把 spec 置 `status: paused`；监察员向所有活跃子代理发暂停/结束令（主脑只向监察员下达意图）；暂停前快照当前 spec 到 `tmp/spec-before-<rev>.md`；pause 记录写 `spec_before_revision/hash/snapshot` 且先于任何 spec 编辑落盘；`check_roles --stage pause --spec <spec>` 必须为 0；暂停期间只做只读盘点与 spec 编辑；重新“签约”+新 `sign_hash` 后才恢复。
 - **reviewer 派发/汇总（C8/C12）**：主脑在派发/返回/检查点必须唤醒 reviewer；patrol 顶层记录 `reviewer_dispatch`、`reviewer_dispatch_at`、`heartbeat_effective_at`、`role_dispatch`、`last_active_at`、`汇总来源`（五角色路径）；`check_roles` 校验顺序/间隔/覆盖。
@@ -106,7 +107,7 @@ version: 5.1.0
 
 1. 现有能力盘点（必须实际查）：逐层查页面/路由、组件、公共逻辑、后端接口、数据表、脚本工具、依赖；目录映射见 `references/project-adaptation.md`。
 2. 三选一决策（必须写理由 + 放弃了什么）：A 复用（现有能力直接满足，只改配置/数据/文案）；B 扩展（现有能力约 80% 满足，加参数/字段/分支且向后兼容）；C 新建（确实没有且复用显著增加复杂度，必须写“复用成本 vs 新建成本”对比）。选 A/B 必须补一句“放弃了什么”——说明未选方案的代价（如选 A 放弃了 B 的扩展余地、选 B 放弃了 C 的彻底解耦）。默认 A/B；选 C 不写对比 = 未通过自审。
-3. 影响面分析：用 `grep` 查调用方/表/配置，写进 spec：受影响页面/路由、接口与调用方、表/字段（含历史数据）、配置/缓存/端口、回归范围；回答是否引入新状态/并发/权限分支、数据模型是否向前兼容、是否改变接口契约。
+3. 影响面分析：优先用 ast-grep（结构化调用方扫描，排除注释/字符串/定义）或 LSP references（语言服务器引用查找）查调用方/表/配置，写进 spec：受影响页面/路由、接口与调用方、表/字段（含历史数据）、配置/缓存/端口、回归范围；回答是否引入新状态/并发/权限分支、数据模型是否向前兼容、是否改变接口契约。无 ast-grep/LSP 时降级为 `grep`（现有方式），不阻断，但 spec 注明"影响面分析用 grep，精度有限"。
 4. 入口清单：从实际架构扫描导航/仪表盘/底栏/深链/搜索/快捷入口/API 调用方等入口；每个入口写打开方式与预期。无 UI 变更 → spec §2 写 `入口清单：无 UI 变更`。
 5. 成本预算：涉及 LLM/付费 API 写单次/日上限与限流；不涉及写“无”。
 6. 测试策略：写 3–5 条可验证验收条件（DoD）→ 升格为 C 条款；指明回归范围；新增 E2E 断言/测试数据只允许写测试库。
@@ -142,6 +143,16 @@ version: 5.1.0
 
 ### 执行中需求变更 / 暂停重签约
 
+**中途变更三分流**（C8）：执行中发现新 bug/新需求，先按"性质(同源/无关) × 成熟度(近完成/早期)"分流（主脑判断 + 用户确认），不一刀切暂停：
+
+| 性质 \ 成熟度 | 近完成 | 早期 |
+|---|---|---|
+| **同源衍生** | ①并入当前：加补充条款，只测新条款，已通过不重跑 | ④并入当前：加补充条款，正常推进 |
+| **无关新项** | ②收尾当前跑到验收，新项记 `docs/backlog.md` 另开契约 | ③看紧急度：更紧急→暂停保存切过去；不紧急→当前继续，新项排队 |
+
+- **冻结已通过**（C8，C16 机器可查）：已核销 ✅/已通过测试/已验收项，变更后默认冻结不重跑；只有变更真影响已冻结项（如改共用接口）才解冻重跑并显式声明"解冻原因"且记入 §9 核销表（C16：check_spec verify 校验解冻记录）；无关新项不得解冻当前已通过工作。
+- **backlog**：无关新项记 `docs/backlog.md`（时间/描述/严重度/来源），当前完成后另开 spec 独立走 9 步。下列暂停机制只在分流③"新项更紧急+在途早期"才触发，其余三种不粗暴暂停。
+
 1. 主脑先回应用户（当前状态/影响/下一步），不得沉默。
 2. spec 立即置 `status: paused`（不先改正文）；监察员向所有活跃子代理发暂停/结束令，主脑只向监察员下达意图。
 3. 暂停前把当前 spec 快照到 `tmp/spec-before-<rev>.md`；pause 记录写 `spec_before_revision/hash/snapshot` 且先于任何 spec 编辑落盘；`check_roles.py --stage pause --spec <spec>` 必须为 0。
@@ -156,10 +167,9 @@ version: 5.1.0
 **纯文档/流程改动**：只改文档/注释/README/脚本文案，无代码逻辑/接口/数据/权限变化 → 免安全审查与 spec，PR 写“变更摘要 + 影响面（仅文档）”。判断口径：能不能跑到线上产物里。改动涉及流程规则/skill 本身/agent 行为约束时不可免流程，必须走完整 spec。
 
 ## Step 3：编码 + 自检
+**开工前机器闸门**（C5）：`check_writes_before_sign.py <spec>` 退出码 0 才编码——spec 未签约（status=draft/paused）时扫 git 工作区，发现实现文件（src/lib/app 等非 docs/.agents/ship-it）被改即退出码 1 拦截；已签约（signed/accepted）退出码 0 放行。与 `check_roles.py --stage start` 并列；把"签约才编码"从事后 git-check 升级为事前编码即拦截。按变更轨道加检查（轨道在 spec「变更类型」节五轨道 + spike 特殊态）：feature 有 UI 变更必出前端演示页（Step 2）；bug 必须先交失败测试（先红后绿，证明 bug 真能复现）；perf 必出性能基线与压测对比；framework 必出迁移影响图与全量回归；spike 探索代码进 scratch 分支永不合并主干；refactor 现有测试不许改（只跑不改，改了 = 测试失效）。
 
-按变更类型加检查（类型在 spec「变更类型」节三选一）：bug 必须先交失败测试（先红后绿，证明 bug 真能复现）；spike 探索代码进 scratch 分支永不合并主干；refactor 现有测试不许改（只跑不改，改了 = 测试失效）。
-
-验证：`node --check <file>.js`、`npx tsc --noEmit`、`python -m py_compile <file>.py`、`npm test`/`pytest`、`npm run lint`/`npm run build`；缺的跳过，有静态闸门就一定跑。
+验证：`node --check <file>.js`、`npx tsc --noEmit`、`python -m py_compile <file>.py`、`npm test`/`pytest`、`npm run lint`/`npm run build`；**可选能力缺失须显式降级声明**（C13）：每个可选能力（Playwright/ast-grep/LSP/CI/CD/tools.restrict 等）缺失时，spec 注明"降级为 X 方式 + 精度影响"，不默默跳过；有静态闸门就一定跑。
 
 ### 大文件写保护（>50KB）
 
@@ -265,7 +275,7 @@ PR 说明四块缺一不可：①版本号 + 变更摘要；②spec 契约（文
 
 ## Step 9：清理 + 变更记录
 
-1. 删远程/本地已合并分支：`git push origin --delete <branch>` / `git branch -d <branch>`。2. 垃圾零容忍：删除 `tmp/`、`.tmp/`、`.dsh-project-memory/`、`tests/__pycache__/`、`test/**/*.tmp`、`*.gz`；一次性测试脚本、诊断脚本、临时日志、截图、`.bak` 备份、guard manifest 全部清掉；`git status` 只剩有意提交的文件；确认 `.gitignore` 覆盖到位。pre-commit hook 说明：`.git/hooks/pre-commit` 是本地门禁，不入库、不提交，Step 9 不删除。3. 写变更记录（`CHANGELOG.md` 顶部或项目既有 `deploy-log.md`）：版本、变更内容、测试环境验证、生产部署与验证。4. 同步受影响的文档（端口/表结构/接口/文件清单）。5. 向用户汇报：合并的 PR、版本号、生产状态、清理结果、请强刷提示。
+1. 删远程/本地已合并分支：`git push origin --delete <branch>` / `git branch -d <branch>`。2. 垃圾零容忍：删除 `tmp/`、`.tmp/`、`.dsh-project-memory/`、`tests/__pycache__/`、`test/**/*.tmp`、`*.gz`；一次性测试脚本、诊断脚本、临时日志、截图、`.bak` 备份、guard manifest 全部清掉；`git status` 只剩有意提交的文件；确认 `.gitignore` 覆盖到位。**局部 Git 校验**（C12）：校验限缩到 spec §2「变更涉及的文件清单」——清单内的文件必须干净（已提交/已删），清单外的未提交改动只告警不阻塞（避免项目里本来就有别的未提交改动被误判为脏）。pre-commit hook 说明：`.git/hooks/pre-commit` 是本地门禁，不入库、不提交，Step 9 不删除。3. 写变更记录（`CHANGELOG.md` 顶部或项目既有 `deploy-log.md`）：版本、变更内容、测试环境验证、生产部署与验证。4. 同步受影响的文档（端口/表结构/接口/文件清单）。5. 向用户汇报：合并的 PR、版本号、生产状态、清理结果、请强刷提示。
 
 ## 版本号规则
 

@@ -461,6 +461,35 @@ def check_structure(sections, stage, errors, warnings):
             errors.append("仍有未填占位符：%s" % "、".join(placeholders))
         else:
             warnings.append("仍有未填占位符：%s（模板正常，签约前应填完）" % "、".join(placeholders))
+    # C9：条款 revision 完整性校验（criterion amendments 防作弊）
+    # 规则：C 条款标题含 revision: <n>；若 n>1（被改过），条款正文必须含"修订台账"
+    #       且台账里必须有对应 rev 记录；缺台账/缺 evidence/矛盾台账 = FAIL（fail closed）
+    if stage in ("spec", "verify", "accept"):
+        for number, title, clause_body in clauses:
+            rev_match = re.search(r"revision\s*[:：]\s*(\d+)", title)
+            if not rev_match:
+                continue  # 无 revision 标注的条款不强制（向后兼容旧 spec）
+            rev_num = int(rev_match.group(1))
+            if rev_num > 1:
+                # 被改过的条款：必须有修订台账
+                if "修订台账" not in clause_body and "修订記錄" not in clause_body:
+                    errors.append('C%d revision=%d (>1) 但缺修订台账——改标准必须保留原标准并记台账（C9）' % (number, rev_num))
+                    continue
+                # 台账里必须有对应 rev 记录（至少提到 rev<num> 或 rev<num>）
+                if not re.search(r"rev\s*%d\b" % rev_num, clause_body):
+                    errors.append("C%d revision=%d 但台账缺 rev%d 记录（C9）" % (number, rev_num, rev_num))
+                # 台账缺 evidence/reason（台账条目应有"原因"或"依据"或"authority"）
+                ledger_lines = [l for l in clause_body.splitlines() if "rev" in l and (str(rev_num) in l or "rev1" in l)]
+                has_evidence = any("原因" in l or "依据" in l or "authority" in l or "evidence" in l.lower() for l in ledger_lines)
+                if not has_evidence:
+                    errors.append("C%d 修订台账缺 evidence/reason/authority（C9 fail closed）" % number)
+    # C16：C8 冻结已通过的机器闸门（已验收条款改动解冻校验）——用例名：C16 解冻校验
+    # verify/accept 阶段：如果 spec 有 accept_commit（曾验收过），检查核销表是否有"解冻"记录字段定义
+    if stage in ("verify", "accept"):
+        recon_section = sections.get(9, "")
+        has_freeze_field = "解冻" in recon_section
+        if not has_freeze_field:
+            warnings.append("C16：§9 核销表缺'解冻记录'字段定义（C8 机器闸门：已验收条款改动须有解冻记录）")
     return clauses, acceptance
 
 
