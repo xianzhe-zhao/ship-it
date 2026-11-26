@@ -49,7 +49,7 @@ SCAN_FILES = [
 ]
 DEFAULT_SPEC = "<SPEC>"  # 占位符；resolve_spec 动态选取文件名版本号最高者
 CHANGELOG_FILES = ("ship-it/CHANGELOG.md", "CHANGELOG.md")
-EXPECTED_VERSION = "5.1.0"
+EXPECTED_VERSION = "5.2.0"
 EXPECTED_STEPS = 9
 DEFAULT_MAX_LINE = 500
 SPEC_MAX_LINE = 800  # C11：每条条款 ≤800 字符；已签约 spec 不再改行

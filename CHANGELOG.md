@@ -10,6 +10,7 @@ ship-it v5.2.0：开发流程增强，17 条优化（5 轨道/性能工程师/�
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v5.2.0 | 2026-11-26 | 开发流程增强（minor，17 条优化）：5 变更轨道/性能工程师/咨询顾问模式/事前拦截/criterion amendments/三分流/leaf-guard/文档质量检查/C8 机器闸门/条款-实现一致性。spec：docs/specs/2026-11-25-v5.2.0-tracks-roles-degradation.md。minor。 |
 | v5.1.0 | 2026-11-24 | 自身一致性修复（minor）：修 v5.0.0 遗留 4 个真错误（版本号正文矛盾/文件地图漏列/正文未引用新产物/check_text 版本标识矛盾）；修 check_docs.py 默认选 spec bug（硬编码旧 spec → 选文件名版本号最高）。spec：docs/specs/2026-11-24-v5.1.0-skill-self-consistency.md。minor。 |
 | v5.0.0 | 2026-11-23 | 角色清晰化与一致性（major，破坏性：角色改名）：审查员→监察员、需求澄清员→需求分析师（正文范围替换，历史不改写）；8 角色卡加身份字段；前后矛盾检测机器化（check_text 区间通用化、check_docs 跨文件角色硬属性一致性、新建 role-glossary.md + check_terms.py）；模糊判据机器化（方案自审补放弃什么、契约互审列最危险 1-3 假设、spec 模板补好坏条款示例、Step 1 四零件检查单、issue 分类型、变更防膨胀一问、架构规则测试按项目选用、description 瘦身）；执行模式由用户裁定（单干/团队，AI 不得自选）；主脑回复用户四段式格式；最终交付检查总纲；需求分析师 grill-me 四机制。spec：docs/specs/2026-11-23-v5.0.0-role-clarity-consistency.md。major。 |
 | v4.7.2 | 2026-11-20 | 遗留问题修复：run_suite --out 根校验、failure log 密钥扫描、hook/check_text 路径根校验、CI action pin、default_base 删除（--base HEAD）、guard manifest HMAC、reviewer 派发/汇总字段、角色复用、Step 9 清理。patch。 |
