@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>v5.2.1 重做方案 v2 · 决策树 + 问题映射 + 条款草案</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #1f2329; background: #f5f6f8; line-height: 1.65;
+    padding: 32px 20px 64px;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+
+  header { margin-bottom: 28px; }
+  h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+  .subtitle { color: #6b7280; font-size: 14px; }
+  .meta-bar {
+    margin-top: 14px; padding: 12px 16px; background: #fffbeb;
+    border: 1px solid #fde68a; border-radius: 8px; font-size: 13px; color: #92400e;
+  }
+  .meta-bar b { color: #78350f; }
+  .legend {
+    display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px;
+    font-size: 13px; color: #4b5563;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.bug { background: #ef4444; }
+  .dot.flow { background: #f59e0b; }
+  .dot.meta { background: #8b5cf6; }
+  .dot.handled { background: #10b981; }
+  .dot.deferred { background: #6b7280; }
+  .dot.keep { background: #3b82f6; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 19px; font-weight: 700; margin-bottom: 16px; padding-left: 12px; border-left: 4px solid #3b82f6; }
+  h3 { font-size: 15px; font-weight: 600; margin: 18px 0 10px; color: #1e293b; }
+
+  /* 决策树 */
+  .tree-card { background: #fff; border-radius: 10px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .dt-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .dt-table th, .dt-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+  .dt-table th { background: #1e293b; color: #fff; font-weight: 600; font-size: 12.5px; }
+  .dt-table tr:last-child td { border-bottom: none; }
+  .dt-id { font-weight: 700; color: #1e40af; white-space: nowrap; }
+  .dt-lock { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; background: #d1fae5; color: #065f46; }
+  .dt-dep { font-size: 12px; color: #92400e; background: #fffbeb; padding: 1px 6px; border-radius: 4px; }
+
+  /* 问题卡片网格 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 18px; }
+  .card {
+    background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid #eef0f3;
+    display: flex; flex-direction: column;
+  }
+  .card-head { padding: 14px 18px; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+  .card-id { font-size: 12px; opacity: .85; letter-spacing: .5px; }
+  .card-title { font-size: 15px; font-weight: 600; }
+  .cat-bug { background: linear-gradient(135deg,#ef4444,#dc2626); }
+  .cat-flow { background: linear-gradient(135deg,#f59e0b,#d97706); }
+  .cat-meta { background: linear-gradient(135deg,#8b5cf6,#7c3aed); }
+  .cat-handled { background: linear-gradient(135deg,#10b981,#059669); }
+  .cat-deferred { background: linear-gradient(135deg,#6b7280,#4b5563); }
+  .card-body { padding: 16px 18px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .row { font-size: 13.5px; }
+  .row .lbl {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px; margin-right: 8px; vertical-align: top;
+    min-width: 56px; text-align: center;
+  }
+  .lbl-desc { background: #fee2e2; color: #991b1b; }
+  .lbl-root { background: #fef3c7; color: #92400e; }
+  .lbl-fix { background: #d1fae5; color: #065f46; }
+  .lbl-files { background: #dbeafe; color: #1e40af; }
+  .lbl-domain { background: #ede9fe; color: #5b21b6; }
+  .row .val { display: inline-block; width: calc(100% - 76px); color: #374151; }
+  .row .val ul { margin: 4px 0 0 16px; }
+  .row .val li { margin-bottom: 2px; }
+  code {
+    font-family: "SF Mono", Consolas, monospace; font-size: 12.5px;
+    background: #f3f4f6; padding: 1px 5px; border-radius: 3px; color: #be185d;
+  }
+  .diff { margin-top: 6px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
+  .diff-row { display: flex; font-size: 12.5px; }
+  .diff-lbl { padding: 8px 10px; font-weight: 600; flex-shrink: 0; width: 64px; text-align: center; color: #fff; }
+  .diff-before .diff-lbl { background: #ef4444; }
+  .diff-after .diff-lbl { background: #10b981; }
+  .diff-txt { padding: 8px 12px; flex: 1; font-family: "SF Mono", Consolas, monospace; white-space: pre-wrap; }
+  .diff-before .diff-txt { background: #fef2f2; color: #7f1d1d; }
+  .diff-after .diff-txt { background: #f0fdf4; color: #14532d; }
+
+  /* 保留代码盘点表 */
+  table.inventory, table.clauses {
+    width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); font-size: 13px;
+  }
+  table.inventory th, table.inventory td, table.clauses th, table.clauses td {
+    padding: 10px 12px; text-align: left; border-bottom: 1px solid #eef0f3; vertical-align: top;
+  }
+  table.inventory th, table.clauses th { background: #1e293b; color: #fff; font-weight: 600; font-size: 12.5px; }
+  table.inventory tr:last-child td, table.clauses tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; }
+  .b-baseline { background: #dbeafe; color: #1e40af; }
+  .b-fix { background: #fee2e2; color: #991b1b; }
+  .b-flow { background: #fef3c7; color: #92400e; }
+  .b-meta { background: #ede9fe; color: #5b21b6; }
+  .b-keep { background: #d1fae5; color: #065f46; }
+  .clause-id { font-weight: 700; color: #1e40af; white-space: nowrap; }
+  .subitem { display: block; padding: 3px 0 3px 14px; border-left: 2px solid #e5e7eb; margin: 4px 0; font-size: 12.5px; }
+  .subitem .stag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-right: 6px; }
+  .stag-base { background: #dbeafe; color: #1e40af; }
+  .stag-bug { background: #fee2e2; color: #991b1b; }
+  .stag-flow { background: #fef3c7; color: #92400e; }
+  .stag-meta { background: #ede9fe; color: #5b21b6; }
+
+  /* 归属说明框 */
+  .attrition-box {
+    background: #fff; border-radius: 10px; padding: 20px 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06); border-left: 4px solid #6b7280;
+  }
+  .attrition-box p { margin-bottom: 10px; font-size: 13.5px; }
+  .attrition-box ul { margin: 6px 0 6px 20px; font-size: 13.5px; }
+  .attrition-box li { margin-bottom: 4px; }
+
+  footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px; text-align: center; }
+  .note { font-size: 12px; color: #6b7280; font-style: italic; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>v5.2.1 重做方案 v2 · 决策树 + 问题映射 + 条款草案</h1>
+  <div class="subtitle">ship-it skill 可靠性修复 · 契约作废重新立项 · 2026-11-26 · 需求分析师 analyst2 产出，待主脑审核后呈用户确认</div>
+  <div class="meta-bar">
+    <b>本方案与上一版(v1)的区别：</b> v1 由上个需求分析师在<b>决策点未拍板时</b>违规生成最终方案 HTML（B9 错误）。本 v2 严格遵守"先分析+决策点 → 拍板后才出最终 HTML"两步分离纪律，
+    经 D1-D9 共 8 个决策点逐轮与用户确认（一次一个问题 + 推荐答案 + 理由）后生成。所有决策均为用户拍板的锁定值，非分析师臆断。
+    <br><b>v2.1 修订（监察员独立核查后）</b>：B2/B3 两处"实测核实"断言原低估，已据主脑+监察员双跑 pytest 的铁证修正——B2 定性 test_v5_1_0_self_consistency.py 7 failed（路径+版本号双重过期），处置"保留改造"；B3 更正 TERM_PAIRS 为 5 组（非 2 组）须全量处理。
+  </div>
+  <div class="legend">
+    <span><i class="dot bug"></i>实现 Bug（B1-B6，红色）</span>
+    <span><i class="dot flow"></i>流程缺口（B10-B12，橙色）</span>
+    <span><i class="dot meta"></i>元规则新增（A4/A5/A6，紫色）</span>
+    <span><i class="dot handled"></i>本轮已执行（B9，绿色）</span>
+    <span><i class="dot deferred"></i>归属别处（B7/B8，灰色）</span>
+    <span><i class="dot keep"></i>保留代码（蓝色）</span>
+  </div>
+</header>
+
+<!-- ========== 第一节：锁定决策树 ========== -->
+<section>
+  <h2>一、锁定决策树（D1-D9，全部经用户拍板）</h2>
+  <div class="tree-card">
+    <table class="dt-table">
+      <thead>
+        <tr><th style="width:64px">决策点</th><th>问题</th><th style="width:90px">锁定值</th><th>核心结论</th><th style="width:120px">依赖</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="dt-id">D1</td>
+          <td>新 spec 与旧 C1-C8 契约的关系</td>
+          <td><span class="dt-lock">A</span></td>
+          <td>作废旧 spec + 立全新 spec，条款重新组织编号；C1-C7 已实现代码作"基线事实"写进新 spec §1 背景，新条款引用这批代码</td>
+          <td>根基，D2-D9 依赖</td>
+        </tr>
+        <tr>
+          <td class="dt-id">D2</td>
+          <td>C 条款按什么逻辑分组编号</td>
+          <td><span class="dt-lock">A</span></td>
+          <td>按功能域分组，baseline+fix 合并入同一域的一条 C；流程新增规则各自独立成 C；约 10 条（B7/B8 不进 spec）</td>
+          <td><span class="dt-dep">依赖 D1</span></td>
+        </tr>
+        <tr>
+          <td class="dt-id">D3</td>
+          <td>B1-B6 怎么并入各功能域 C</td>
+          <td><span class="dt-lock">A</span></td>
+          <td>每个 bug 作为所属域 C 的"后置条件子项"显式列出，每子项独立可验证，核销表每 bug 独立一行（用例名独立）</td>
+          <td><span class="dt-dep">依赖 D2</span></td>
+        </tr>
+        <tr>
+          <td class="dt-id">D4</td>
+          <td>A4"废弃契约流程"固化形态</td>
+          <td><span class="dt-lock">A</span></td>
+          <td>双重形态：C 条款机器校验（check_spec 识别 signed→paused、校验 pause+复盘记录、校验旧 spec 不复活）+ SKILL.md「契约作废与重新立项」小节（四步标准化）</td>
+          <td><span class="dt-dep">依赖 D2</span></td>
+        </tr>
+        <tr>
+          <td class="dt-id">D5</td>
+          <td>A5"先分析后契约"固化形态</td>
+          <td><span class="dt-lock">A</span></td>
+          <td>双重形态：C 条款（check_spec --stage draft 校验方案分析产出物：引用路径+文件存在+决策树结构标记）+ P 流程约束（SKILL.md Step 1 硬约束"分析未就绪不得进 Step 2"）；与 A7 咬合（产出物即 A7 的 HTML）</td>
+          <td><span class="dt-dep">依赖 D2</span></td>
+        </tr>
+        <tr>
+          <td class="dt-id">D6</td>
+          <td>A6"启动团队模式即派角色"固化形态</td>
+          <td><span class="dt-lock">A</span></td>
+          <td>双轨：C 条款诚实拆分 ai（team-mode.md 主脑卡含"启动即派角色清单"决策表 + check_roles --stage start 验 role_dispatch 完整性）+ human（主脑未反复征求开工确认，用户亲身判定）；P 规则 SKILL.md/team-mode.md 明示</td>
+          <td>独立</td>
+        </tr>
+        <tr>
+          <td class="dt-id">D7</td>
+          <td>B7/B8 归属哪里</td>
+          <td><span class="dt-lock">A</span></td>
+          <td>属全局 harness 使用纪律，不进 ship-it spec（守零耦合原则；check_spec 验不了 goal/blocked，立 C 即 theater）；本次留痕 retrospective+memory-lesson，正式固化另起全局 AGENTS.md 改动（独立 spec，lead 立 team_task 跟踪）</td>
+          <td>独立</td>
+        </tr>
+        <tr>
+          <td class="dt-id">D9</td>
+          <td>旧 spec 处置 + 新 spec 文件名</td>
+          <td><span class="dt-lock">A</span></td>
+          <td>旧 spec 原名置 paused（status signed→paused，spec_revision 保持 1，追加 paused_at+pause_reason，文件名不动不删）；新 spec <code>2026-11-26-v5.2.1-reliability-fixes-redo.md</code>（-redo 后缀）；find_spec 唯一性由 C8 扩展过滤 paused 解决</td>
+          <td>A4 四步实地演练</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">注：D8（A7 修复方案 HTML 定位=分析交付物）、D10（团队模式角色派发清单）、D11（版本号 v5.2.1）在分析阶段已由 lead 指令/A1-A7 明确，无需问用户，故未列入待拍板决策点。</p>
+  </div>
+</section>
+
+<!-- ========== 第二节：问题卡片 ========== -->
+<section>
+  <h2>二、问题 → 修复方案映射（卡片）</h2>
+  <p class="note">B1-B12 + A4/A5/A6 共 15 项全覆盖。B9 本轮已执行（纪律），B7/B8 归属别处（不进 spec），其余 12 项落入新 spec 条款。</p>
+  <div class="grid">
+
+    <!-- B1 -->
+    <div class="card">
+      <div class="card-head cat-bug">
+        <div class="card-title">反复签约 3 次</div>
+        <div class="card-id">B1 · 🔴 实现 Bug · 归 C3</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">spec 落盘后只跑 check_spec --stage draft，没预跑 check_docs；写 C7 条款没自查 spec 自身是否符合 check_docs → 签约后实施才发现 spec 正文触发 STALE/DUP → 改 spec → sign_hash 失效 → 回 draft 重签，反复 3 次。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">签约前缺少"spec 自洽性"预检闸门；check_spec draft 与 check_docs 是两个独立校验，没串联成"签约前三闸门"。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C3 后置条件子项 [B1]：sign 前置三闸门全绿——① <code>check_spec --stage draft</code> ② <code>check_docs --root .</code> ③ <code>check_spec --stage spec --print-sign-hash</code>（dry-run 算 hash 不写）。任一非 0 不得签约。固化进 spec_flow.py sign 子命令前置钩子。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/scripts/spec_flow.py</code>（sign 前置三闸门）</li><li><code>ship-it/SKILL.md</code> Step 2 签约节</li><li>新 spec C3 后置条件子项 [B1]</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">落盘 spec → check_spec --stage draft → 用户"签约" → 实施 → 发现 STALE/DUP → 改 spec → 回 draft（×3）</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">落盘 spec → 三闸门(draft+docs+print-sign-hash dry-run)全绿 → 用户"签约" → 实施（一次过）</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B2 -->
+    <div class="card">
+      <div class="card-head cat-bug">
+        <div class="card-title">C1 路径迁移漏盘测试 fixture</div>
+        <div class="card-id">B2 · 🔴 实现 Bug · 归 C1</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">C1 改了脚本/CI 前缀 docs/specs/ → ship-it/docs/specs/，但没估到 test_process_gates 等 4 个测试文件的 fixture 路径也依赖 docs/specs/，导致 tests.run_suite 卡住。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">影响面分析只扫了脚本/CI，没扫测试目录的所有引用；"影响面"定义缺测试 fixture 这一类。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C1 后置条件子项 [B2]：影响"路径/前缀"类改动时，影响面分析必须 grep 测试目录所有引用（<code>grep -r "docs/specs" tests/</code>）；SKILL.md Step 2「影响面」清单加"测试 fixture"必查项；self-check.md 影响面清单同步。<b>实测核实（主脑+监察员双跑 pytest，非凭印象）</b>：<code>tests/test_process_gates.py</code> 的 SPEC_REL/SPEC_REL_472/LEGACY_SPEC_REL 已改为 <code>ship-it/docs/specs/</code> 前缀（第 59/60/68 行）✓；<code>tests/test_v5_1_0_self_consistency.py</code> 实测 <b>7 failed / 3 passed</b>，问题已定性（非"需进一步核实"）：<br>　① 第 165 行 <code>assert spec.startswith("docs/specs/")</code>——check_docs 实际返回 <code>ship-it/docs/specs/...</code>，断言永不成立，<b>须改</b>为 ship-it/docs/specs/ 前缀；<br>　② 第 266 行 <code>--spec docs/specs/2026-11-24-v5.1.0-...</code>——真实 spec 已迁至 ship-it/docs/specs/，报"--spec 不存在"，<b>须改</b>为 ship-it/docs/specs/ 前缀；<br>　③ 第 187 行是 tempfile 临时 fixture（base_a/docs/specs），前缀正确，<b>可不改</b>；<br>　④ <code>tests/support/harness.py</code> 第 156 行是 git blob 映射的路径前缀匹配，<b>需结合 git 历史判断</b>（Step 2 落盘时核实）；<br>　⑤ <b>额外发现（版本号双重过期）</b>：该文件还硬编码 <code>EXPECTED_VERSION=5.1.0</code>（第 111 行等），现仓库已 5.2.1，test_c1/c10 因此失败——整个文件处于失败状态。<br><b>处置表态（方案明确）</b>：test_v5_1_0_self_consistency.py 是 v5.1.0 时代的自洽性测试，v5.2.1 升级后路径+版本号双重过期。本次重做采用"<b>保留改造</b>"策略——将其改造为 v5.2.1 自洽性测试（路径前缀改 ship-it/docs/specs/、EXPECTED_VERSION 改 5.2.1 或动态读 SKILL.md），与已建的 tests/test_v5_2_1_reliability.py（25 用例）并存，前者测跨版本自洽性、后者测 v5.2.1 新增条款。不废弃旧文件（保留历史回归价值），但必须改造使其绿。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/SKILL.md</code> Step 2 影响面节</li><li><code>ship-it/references/self-check.md</code>（影响面清单）</li><li><code>tests/test_v5_1_0_self_consistency.py</code>（改造：路径前缀 + EXPECTED_VERSION）</li><li><code>tests/support/harness.py</code> 第 156 行（git 历史核实）</li><li>新 spec C1 后置条件子项 [B2]</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">影响面 = 脚本 + CI + 文档（漏 tests/）；test_v5_1_0_self_consistency.py 7 failed 无人管</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">影响面 = 脚本 + CI + 文档 + 测试 fixture（grep tests/ 全扫）；test_v5_1_0_self_consistency.py 改造为 v5.2.1 自洽（路径+版本号）</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B3 -->
+    <div class="card">
+      <div class="card-head cat-bug">
+        <div class="card-title">C5 改术语漏改 check_text</div>
+        <div class="card-id">B3 · 🔴 实现 Bug · 归 C5</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">C5 新建 term-glossary.md 并改 check_terms.py 加双词典源，但 check_text.py 也有术语分歧检测（硬编码"五选一/五轨道"对），没 pop term-glossary.md → 词典别名被当跨文件分歧误报。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">术语检测分散在两个脚本（check_terms + check_text），改一处没同步另一处；缺乏"术语检测单一入口"约束。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C5 后置条件子项 [B3]：<b>实测核实（主脑+监察员双核，非凭印象）</b>：<code>check_text.py</code> 第 174 行已 <code>pop term-glossary.md</code>（部分已修，别名不再误报分歧），但第 164-171 行 <code>TERM_PAIRS</code> 仍硬编码 <b>5 组</b>术语对（非 2 组，须全量处理）：<br>　① <code>("五选一","五轨道")</code>——变更轨道数量<br>　② <code>("五条轨道","五轨道")</code>——变更轨道数量<br>　③ <code>("代码审查员","代码安全员")</code>——角色名（应以代码安全员为准）<br>　④ <code>("审查员","监察员")</code>——角色名（应以监察员为准）<br>　⑤ <code>("需求澄清员","需求分析师")</code>——角色名（应以需求分析师为准）<br>根因"术语检测分散在两脚本"未根治。修复：① 将 check_text 硬编码 5 组术语对改为从 term-glossary.md 词典读（消除第二份硬编码源）；② 术语检测逻辑改动时必须 grep 所有脚本 <code>grep -rl "术语\|term\|glossary" ship-it/scripts/</code> 同步；③ 长期把术语检测收敛到 check_terms 单一入口，check_text 只做文本质量不碰术语。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/scripts/check_text.py</code>（pop term-glossary，已改）</li><li><code>ship-it/scripts/check_terms.py</code></li><li>新 spec C5 后置条件子项 [B3]</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">check_terms 读双词典 ✓ / check_text 硬编码术语对 ✗ → 别名误报分歧</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">check_terms + check_text 共享 term-glossary.md 单一词典源；改术语必 grep 全脚本同步</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B4 -->
+    <div class="card">
+      <div class="card-head cat-bug">
+        <div class="card-title">spec_flow front matter 格式与手填不一致</div>
+        <div class="card-id">B4 · 🔴 实现 Bug · 归 C3</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">spec_flow.py 写 front matter 的字段格式（缩进/引号/顺序）与人工手填的不一致，导致 check_spec 误报或字段对不上。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">spec_flow 写 front matter 没严格对齐 check_spec 的 SIGN_FIELDS/ACCEPT_FIELDS 常量定义，存在复制粘贴漂移。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C3 后置条件子项 [B4]：spec_flow 必须 import check_spec 的 COMMON_FM_KEYS/ACCEPT_FM_KEYS 常量（而非复制），写 front matter 字段顺序/引号风格与 check_spec 期望逐字对齐；测试断言 <code>"from check_spec import"</code> 存在（test_c3_fields_align_check_spec 已覆盖）。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/scripts/spec_flow.py</code>（import 常量，已改）</li><li>新 spec C3 后置条件子项 [B4]</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">spec_flow 复制字段定义 → 与 check_spec 常量漂移 → 格式不一致</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">spec_flow import check_spec 常量 → 单一来源 → 格式恒一致</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B5 -->
+    <div class="card">
+      <div class="card-head cat-bug">
+        <div class="card-title">核销表用例名与测试方法名不匹配</div>
+        <div class="card-id">B5 · 🔴 实现 Bug · 归 C3</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">核销表"用例名"列写的名字与测试文件里实际的 def 方法名不完全匹配，reconcile 校验若宽松则放过假绿，若严格则误报。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">reconcile 校验用例名存在性的逻辑不够严格（模糊匹配或只查文件名不查 def 名），核销表填写时手抖。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C3 后置条件子项 [B5]：reconcile 校验核销表"用例名"列每个名字必须在测试文件中以 <code>def &lt;name&gt;(</code> 精确匹配（AST 级或正则 ^def\s+&lt;name&gt;\s*\();不匹配 → 退出码 1；核销表填写时用例名须与 def 名一字不差。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/scripts/spec_flow.py</code>（reconcile 精确匹配）</li><li><code>ship-it/scripts/check_spec.py</code>（核销表校验）</li><li>新 spec C3 后置条件子项 [B5]</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">reconcile 模糊匹配用例名 → 假绿或误报</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">reconcile 精确匹配 def 名 → 用例名与测试方法名一字不差</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B6 -->
+    <div class="card">
+      <div class="card-head cat-bug">
+        <div class="card-title">核销表文本触发 check_docs STALE/计数检测</div>
+        <div class="card-id">B6 · 🔴 实现 Bug · 归 C3</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">核销表里的文本（如重复出现的"✅"、"机器："前缀、用例名）触发 check_docs 的 DUP 短重复检测或 STALE 计数，导致核销表所在 spec 文件自身被 check_docs 误报。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">check_docs 的 DUP/STABLE 检测没对 spec 文件的核销表区域（§9）做豁免或调参，核销表的表格化重复文本被当成文档质量问题。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C3 后置条件子项 [B6]：check_docs 对 spec 文件 §9 核销表区域（"## 9. 核销记录"至文件尾或下一级标题）豁免 DUP 短重复检测，或将核销表常见前缀（"✅"、"机器："、"用例名"）加入 allowlist；构造核销表 fixture 断言 check_docs 退出码 0。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/scripts/check_docs.py</code>（核销表区域豁免/allowlist）</li><li>新 spec C3 后置条件子项 [B6]</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">核销表重复文本 → check_docs DUP/STALE 误报 → spec 自身不合规</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">核销表区域豁免/allowlist → check_docs 对核销表不误报</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B7 -->
+    <div class="card">
+      <div class="card-head cat-deferred">
+        <div class="card-title">反复催促（goal 续轮 vs 等用户输入）</div>
+        <div class="card-id">B7 · ⚪ 归属别处 · 不进 spec</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">goal 自动续轮与"等用户输入"冲突，每轮都发"等你"消息，反复催促用户。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">harness 的 goal 机制（create_goal/update_goal）与等用户输入的协调不当；属 agent 运行时行为，非 ship-it 9 步代码变更流程。</span></div>
+        <div class="row"><span class="lbl lbl-fix">归属</span><span class="val"><b>D7=A 锁定：属全局 harness 使用纪律，不进 ship-it spec。</b>理由：① 守 ship-it 零耦合原则（voided spec §2 明确"不引入宿主依赖"），goal 是宿主机制；② check_spec 验不了 goal 续轮行为，立 C 即 theater 假绿；③ 全局 AGENTS.md 已是 harness 行为强制规范载体，补进去对所有会话/项目生效，比塞进 ship-it 强。</span></div>
+        <div class="row"><span class="lbl lbl-files">本次留痕</span><span class="val"><ul><li><code>docs/reviews/2026-11-26-retrospective.md</code>（记录 B7）</li><li><code>docs/reviews/2026-11-26-memory-lesson.md</code>（C8 式沉淀防复发）</li><li>正式固化：<b>另起全局 AGENTS.md 改动（独立 spec，"改规则者受规则约束"），由 lead 立 team_task 跟踪</b></li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">B7 无明确归属 → 反复催促无人管</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">B7 归全局 AGENTS.md（另起 team_task）+ 本次 retrospective/memory-lesson 留痕</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B8 -->
+    <div class="card">
+      <div class="card-head cat-deferred">
+        <div class="card-title">blocked 用得过滥</div>
+        <div class="card-id">B8 · ⚪ 归属别处 · 不进 spec</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">等用户输入不是技术死锁，却反复标 blocked；blocked 用得过滥，稀释了真正技术死锁的信号。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">harness 的 blocked 状态误用——"等用户输入"与"技术死锁"未区分；属 agent 运行时行为。</span></div>
+        <div class="row"><span class="lbl lbl-fix">归属</span><span class="val"><b>D7=A 锁定：与 B7 同属全局 harness 使用纪律，不进 ship-it spec。</b>同 B7 理由（零耦合、不可机器验、全局 AGENTS.md 更强执行）。</span></div>
+        <div class="row"><span class="lbl lbl-files">本次留痕</span><span class="val"><ul><li><code>docs/reviews/2026-11-26-retrospective.md</code>（记录 B8）</li><li><code>docs/reviews/2026-11-26-memory-lesson.md</code>（沉淀）</li><li>正式固化：同 B7，另起全局 AGENTS.md 改动 team_task</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">等用户输入 = blocked → 信号稀释 → 真 deadlock 被淹没</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">等用户输入 ≠ blocked；blocked 仅限技术死锁（全局 AGENTS.md 规定）</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B9 -->
+    <div class="card">
+      <div class="card-head cat-handled">
+        <div class="card-title">未拍板就生成最终方案 HTML</div>
+        <div class="card-id">B9 · 🟢 本轮已执行 · 纪律</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">上个需求分析师在决策点未拍板时就生成最终方案 HTML（v1 redo-proposal.html），把决策树答案和修复方案全写死，违反"方案分析与最终方案分两步"。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">需求分析师未区分"分析+决策点"与"最终方案"两步，急于产出可视化解；ship-it Step 1 既有"分轮追问"规则未被遵守。</span></div>
+        <div class="row"><span class="lbl lbl-fix">本轮执行</span><span class="val"><b>本轮已严格执行两步分离：</b>① 第一步只做分析+决策点（D1-D9 逐轮提问，一次一个最关键问题+推荐答案+理由，未生成 HTML）；② 所有决策点拍板后才进入第二步生成本 HTML。本 v2 即第二步产物。该纪律由 A5（C9）固化进新 spec 防复发。</span></div>
+        <div class="row"><span class="lbl lbl-files">关联</span><span class="val"><ul><li>本 HTML（第二步产物）</li><li>新 spec C9（A5 先分析后契约）固化此纪律</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">未拍板就出最终 HTML → 决策树答案被臆断写死</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">先分析+决策点（分轮）→ 拍板后才出最终 HTML（本 v2）</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B10 -->
+    <div class="card">
+      <div class="card-head cat-flow">
+        <div class="card-title">一次性扔给用户所有问题</div>
+        <div class="card-id">B10 · 🟠 流程缺口 · 归 C7</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">主脑和上个需求分析师都一次性抛多个问题给用户，违反 ship-it Step 1 既有"分轮追问"规则（一次问一个最关键问题+推荐答案+理由）。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">C7 已校验"分轮格式"（R1/R2…），但只管"问得对不对"（格式），未强化"一次只问一个"的纪律执行；主脑/分析师未自觉遵守。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C7 后置条件子项 [B10]：强化分轮纪律——① team-mode.md 需求分析师卡补"一次只问一个最关键问题，附推荐答案与理由，上一轮答复后才进下一轮"（已有"分轮追问纪律"，本轮再加"一次一个"明示）；② check_spec --stage draft 校验每轮只有一个核心问题（启发式：每轮"据此提问"栏只含一个问号或一个"Q"标记）。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/references/team-mode.md</code>（需求分析师卡强化）</li><li><code>ship-it/scripts/check_spec.py</code>（draft 每轮单问题校验）</li><li>新 spec C7 后置条件子项 [B10]</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">一次性抛多问题 → 用户负担重 + 决策混乱</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">一次一个最关键问题 + 推荐答案 + 理由 → 上一轮答复后才进下一轮</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B11 -->
+    <div class="card">
+      <div class="card-head cat-flow">
+        <div class="card-title">主脑没按工作流走（反复问"确认我开始吗"）</div>
+        <div class="card-id">B11 · 🟠 流程缺口 · 归 C10</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">用户说"启动团队模式"时主脑就该知道派角色，但主脑反复问用户"确认我开始吗"，未按 ship-it 工作流自主推进。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">team-mode.md 主脑卡未明示"启动即派角色"的强制性，主脑把"启动团队模式"当成需再次确认的请求而非授权。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C10 后置条件子项 [B11]（与 A6 同条）：① team-mode.md 主脑卡含"启动即派角色清单"决策表，明示"用户已说'启动团队模式'=授权派角色，不得反复征求开工确认"；② SKILL.md 团队模式节引用；③ human 验收：主脑启动时未反复征求开工确认（用户亲身判定）。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/references/team-mode.md</code>（主脑卡"启动即派角色清单"）</li><li><code>ship-it/SKILL.md</code>（团队模式节引用）</li><li>新 spec C10 后置条件子项 [B11]</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">用户"启动团队模式" → 主脑"确认我开始吗?" → 反复 stall</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">用户"启动团队模式" = 授权派角色 → 主脑即派角色清单 → 不 stall</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B12 -->
+    <div class="card">
+      <div class="card-head cat-flow">
+        <div class="card-title">方案分析与写契约搅在一起</div>
+        <div class="card-id">B12 · 🟠 流程缺口 · 归 C9（核心）</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">问题</span><span class="val">spec 是别人写好交接的，没做方案分析就签了，签约后边实施边发现方案有问题 → 反复返工。方案分析与写契约搅在一起，没有"先分析后契约"的硬顺序。</span></div>
+        <div class="row"><span class="lbl lbl-root">根因</span><span class="val">ship-it Step 1→Step 2 转换无硬约束"方案分析产出物未就绪不得落盘 spec"；check_spec draft 闸门未校验方案分析产出物存在。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C9（A5）双重形态：① C 条款 check_spec --stage draft 校验三点（spec §1/§2 引用方案分析产出物路径 + 路径文件存在 + 含决策树结构标记 token），任一不满足 → draft 不通过 → 无法签约；② P 流程约束 SKILL.md Step 1 末尾硬约束"方案分析产出物未就绪不得进 Step 2 落盘 spec"。借 draft 先于 sign 的状态机天然保证顺序。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/scripts/check_spec.py</code>（draft 闸门校验方案分析产出物）</li><li><code>ship-it/SKILL.md</code> Step 1 末尾硬约束</li><li>新 spec C9</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">spec 交接 → 直接签约 → 实施中发现方案问题 → 反复返工</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">方案分析产出物就绪 → check_spec draft 绿 → 才能落盘签约 → 实施一次过</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A4 -->
+    <div class="card">
+      <div class="card-head cat-meta">
+        <div class="card-title">废弃契约流程标准化</div>
+        <div class="card-id">A4 · 🟣 元规则新增 · 归 C8</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">要求</span><span class="val">"废弃契约流程"加进新流程条款：契约作废 → 复盘 → 重新立项写成标准流程。</span></div>
+        <div class="row"><span class="lbl lbl-root">现状</span><span class="val">ship-it 无"契约作废与重新立项"的标准流程，作废靠临时操作，无机器校验。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C8 双重形态（D4=A）：① C 条款机器校验——check_spec 能识别 signed→paused 转换、校验同日 pause 记录 + 复盘/memory-lesson 记录存在、校验新 spec 落盘后旧 spec 维持 paused 不复活；扩展 check_roles.find_spec 同日多候选过滤 status: paused 取唯一活跃 spec（D9=A）；② SKILL.md「契约作废与重新立项」小节标准化四步：作废判定 → 暂停(paused+记录) → 复盘(retrospective/memory-lesson) → 重新立项(新 spec，旧 spec 不删不复活)。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/scripts/check_spec.py</code>（signed→paused 识别 + pause/复盘记录校验）</li><li><code>ship-it/scripts/check_roles.py</code>（find_spec 过滤 paused）</li><li><code>ship-it/SKILL.md</code>（「契约作废与重新立项」小节）</li><li>新 spec C8</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">契约作废靠临时操作 → 无标准流程 → 无机器校验</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">四步标准流程 + C 条款机器校验 + SKILL.md 永久文档</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A5 -->
+    <div class="card">
+      <div class="card-head cat-meta">
+        <div class="card-title">先分析方案再写契约（顺序固化）</div>
+        <div class="card-id">A5 · 🟣 元规则新增 · 归 C9</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">要求</span><span class="val">"先分析方案再写契约"这个顺序要固化，不能跳过方案分析直接写契约。</span></div>
+        <div class="row"><span class="lbl lbl-root">现状</span><span class="val">ship-it Step 1→Step 2 转换无硬约束，主脑可跳过方案分析直接落盘 spec（B12 即因此发生）。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C9 双重形态（D5=A）：① C 条款 check_spec --stage draft 校验方案分析产出物（引用路径+文件存在+决策树结构标记 token），不满足则 draft 不过 → 无法签约（借 draft 先于 sign 状态机）；② P 流程约束 SKILL.md Step 1 末尾硬约束"方案分析产出物未就绪不得进 Step 2 落盘 spec"。与 A7 咬合：产出物即 A7 的 HTML（本次 redo-proposal-v2.html）。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/scripts/check_spec.py</code>（draft 闸门校验产出物）</li><li><code>ship-it/SKILL.md</code> Step 1 末尾硬约束</li><li>新 spec C9</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">Step 1→Step 2 无硬顺序 → 可跳过分析直接签约</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">方案分析产出物就绪 → draft 闸门绿 → 才能 Step 2 落盘签约</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A6 -->
+    <div class="card">
+      <div class="card-head cat-meta">
+        <div class="card-title">启动团队模式主脑即知派角色</div>
+        <div class="card-id">A6 · 🟣 元规则新增 · 归 C10</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="lbl lbl-desc">要求</span><span class="val">"启动团队模式"时主脑就该知道干什么（派角色），不需用户提醒。</span></div>
+        <div class="row"><span class="lbl lbl-root">现状</span><span class="val">team-mode.md 主脑卡未明示"启动即派角色"强制性，主脑把"启动团队模式"当需确认请求（B11）。</span></div>
+        <div class="row"><span class="lbl lbl-fix">修复</span><span class="val">C10 双轨（D6=A）：① C 条款 ai 部分——team-mode.md 主脑卡含"启动即派角色清单"决策表（结构校验：清单存在+列明角色/顺序/禁止 stall）+ check_roles --stage start 验 role_dispatch 完整性（已有机制纳入核销）；② C 条款 human 部分——主脑启动时未反复征求开工确认（用户亲身判定，平行旧 C8 human 验收）；③ P 规则 SKILL.md/team-mode.md 明示"启动即派角色，不得反复征求开工确认"。</span></div>
+        <div class="row"><span class="lbl lbl-files">文件</span><span class="val"><ul><li><code>ship-it/references/team-mode.md</code>（主脑卡"启动即派角色清单"决策表）</li><li><code>ship-it/SKILL.md</code>（团队模式节引用）</li><li>新 spec C10</li></ul></span></div>
+        <div class="diff">
+          <div class="diff-row diff-before"><div class="diff-lbl">改前</div><div class="diff-txt">"启动团队模式" → 主脑问"确认我开始吗?" → stall</div></div>
+          <div class="diff-row diff-after"><div class="diff-lbl">改后</div><div class="diff-txt">"启动团队模式" = 授权 → 主脑即派角色清单（ai 校验 + human 验收）</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========== 第三节：保留代码盘点 ========== -->
+<section>
+  <h2>三、保留代码盘点（C1-C7 实现 + 25 测试用例）</h2>
+  <p class="note">D1=A 锁定：C1-C7 已实现代码作"基线事实"保留，新 spec §1 背景引用，新条款（C1-C7 功能域）把这批代码作为基线项验收。下表为盘点依据。</p>
+  <table class="inventory">
+    <thead>
+      <tr><th style="width:60px">域</th><th>功能</th><th>实现文件</th><th>测试用例（tests/test_v5_2_1_reliability.py）</th><th>状态</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="clause-id">C1</td>
+        <td>spec 目录统一到 ship-it/docs/specs/</td>
+        <td><code>ship-it/docs/specs/</code>（13 迁入 + v5.2.0）；CI <code>.github/workflows/ship-it-gates.yml</code> 前缀对齐</td>
+        <td>test_c1_toplevel_docs_specs_deleted / test_c1_ship_it_docs_specs_has_specs / test_c1_ci_prefix_aligned（3）</td>
+        <td><span class="badge b-keep">保留</span></td>
+      </tr>
+      <tr>
+        <td class="clause-id">C2</td>
+        <td>EXPECTED_VERSION 动态读 SKILL.md frontmatter</td>
+        <td><code>ship-it/scripts/check_docs.py</code>（extract_version + dynamic_version + global EXPECTED_VERSION + fail closed）</td>
+        <td>test_c2_skill_md_version_exists / test_c2_check_docs_dynamic_read_logic / test_c2_check_docs_reads_skill_md / test_c2_check_docs_passes_on_current_repo / test_c2_fail_closed_when_skill_md_missing（5）</td>
+        <td><span class="badge b-keep">保留</span></td>
+      </tr>
+      <tr>
+        <td class="clause-id">C3</td>
+        <td>spec_flow.py 一条命令 sign/accept/reconcile</td>
+        <td><code>ship-it/scripts/spec_flow.py</code>（三子命令 + import check_spec 常量 + FAIL 回滚）</td>
+        <td>test_c3_spec_flow_exists_and_compiles / test_c3_three_subcommands / test_c3_fields_align_check_spec（3）</td>
+        <td><span class="badge b-keep">保留</span></td>
+      </tr>
+      <tr>
+        <td class="clause-id">C4</td>
+        <td>local_check.py 本地严格复刻 CI 四步</td>
+        <td><code>ship-it/scripts/local_check.py</code>（4 步 1:1 + base 双模式 + 不加 check_roles）</td>
+        <td>test_c4_local_check_exists_and_compiles / test_c4_four_steps_replicate_ci / test_c4_base_dual_mode / test_c4_no_check_roles（4）</td>
+        <td><span class="badge b-keep">保留</span></td>
+      </tr>
+      <tr>
+        <td class="clause-id">C5</td>
+        <td>文档质量盲区修补（DUP 短文本 + 流程术语）</td>
+        <td><code>ship-it/scripts/check_docs.py</code>（CORE_PAIR_MIN_CHARS=15）；<code>ship-it/references/term-glossary.md</code>（新建）；<code>ship-it/scripts/check_terms.py</code>（双词典）</td>
+        <td>test_c5_core_pair_threshold_15 / test_c5_term_glossary_exists / test_c5_check_terms_dual_glossary / test_c5_check_terms_passes（4）</td>
+        <td><span class="badge b-keep">保留</span></td>
+      </tr>
+      <tr>
+        <td class="clause-id">C6</td>
+        <td>已验收条款被改强制解冻重跑</td>
+        <td><code>ship-it/scripts/check_spec.py</code>（check_thaw 函数 + git diff + accept_commit + 无 commit 跳过）</td>
+        <td>test_c6_check_thaw_function_exists / test_c6_old_c16_warning_removed / test_c6_skips_without_accept_commit（3）</td>
+        <td><span class="badge b-keep">保留</span></td>
+      </tr>
+      <tr>
+        <td class="clause-id">C7</td>
+        <td>分轮追问 + 先查验塑形 + 澄清记录可查</td>
+        <td><code>ship-it/scripts/check_spec.py</code>（draft 校验 R1/查验/据此提问）；<code>ship-it/references/team-mode.md</code>（分轮追问纪律）；<code>ship-it/references/spec-template.md</code>（分轮决策清单）</td>
+        <td>test_c7_draft_validates_rounds_format / test_c7_team_mode_has_round_discipline / test_c7_spec_template_has_rounds_format（3）</td>
+        <td><span class="badge b-keep">保留</span></td>
+      </tr>
+      <tr>
+        <td colspan="3" style="text-align:right;font-weight:600">合计测试用例</td>
+        <td><b>25 个</b>（C1:3 + C2:5 + C3:3 + C4:4 + C5:4 + C6:3 + C7:3）</td>
+        <td><span class="badge b-keep">全保留</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">注：C8（出错点沉淀记忆）为 human 验收，不在测试文件内；本次重做 C8 重新定义为"废弃契约流程标准化"（A4），原 C8 记忆沉淀职能并入 retrospective/memory-lesson 留痕。</p>
+  <p class="note"><b>监察员独立核查后的修订（v2.1）</b>：B2/B3 实测核实断言原低估，已据主脑+监察员双跑 pytest 的铁证修正——B2 定性 test_v5_1_0_self_consistency.py 7 failed（路径 line 165/266 须改 + 版本号 EXPECTED_VERSION=5.1.0 须改），处置表态"保留改造"不废弃；B3 更正 TERM_PAIRS 为 5 组（非 2 组）须全量处理。详见 B2/B3 卡片及 C1[C5] 草案。</p>
+</section>
+
+<!-- ========== 第四节：C 条款草案轮廓 ========== -->
+<section>
+  <h2>四、新 spec C 条款草案轮廓（~10 条）</h2>
+  <p class="note">D2=A 按功能域分组，D3=A 每 bug 作后置条件子项。下表为草案轮廓，具体措辞待 Step 2 落盘 spec 时定稿。标签：🔵基线 / 🔴Bug / 🟠流程 / 🟣元规则。</p>
+  <table class="clauses">
+    <thead>
+      <tr><th style="width:60px">C 条款</th><th>功能域</th><th>后置条件构成（基线 + 子项）</th><th>验收方式</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="clause-id">C1</td>
+        <td>spec 目录统一</td>
+        <td>
+          <span class="subitem"><span class="stag stag-base">基线</span>13 旧 spec git mv 迁入 ship-it/docs/specs/，toplevel 删除；脚本/CI 前缀对齐；接入指南 docs/specs/ 不动</span>
+          <span class="subitem"><span class="stag stag-bug">B2</span>影响"路径/前缀"类改动时影响面必 grep tests/ 全扫；SKILL.md Step 2 影响面清单加"测试 fixture"必查项；test_v5_1_0_self_consistency.py 须改造（路径前缀 line 165/266 改 ship-it/docs/specs/ + EXPECTED_VERSION 改 5.2.1 或动态读），保留改造不废弃</span>
+        </td>
+        <td>ai（路径+前缀一致性+退出码）</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C2</td>
+        <td>版本动态读</td>
+        <td>
+          <span class="subitem"><span class="stag stag-base">基线</span>check_docs 从 SKILL.md frontmatter 动态读 version 赋 EXPECTED_VERSION；读不到/格式非法 exit 1（fail closed）</span>
+        </td>
+        <td>ai（check_docs 退出码+版本一致性）</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C3</td>
+        <td>spec_flow 一条命令 + 签约前自洽 + 核销可查</td>
+        <td>
+          <span class="subitem"><span class="stag stag-base">基线</span>sign/accept/reconcile 三子命令；sign 写完即跑 check_spec，FAIL 回滚；accept_commit 取 HEAD</span>
+          <span class="subitem"><span class="stag stag-bug">B1</span>sign 前置三闸门：check_spec --stage draft + check_docs + print-sign-hash dry-run，任一非 0 不得签约</span>
+          <span class="subitem"><span class="stag stag-bug">B4</span>spec_flow import check_spec 常量（COMMON_FM_KEYS/ACCEPT_FM_KEYS），front matter 字段格式逐字对齐</span>
+          <span class="subitem"><span class="stag stag-bug">B5</span>reconcile 校验核销表用例名以 def &lt;name&gt;( 精确匹配测试文件，不匹配 exit 1</span>
+          <span class="subitem"><span class="stag stag-bug">B6</span>check_docs 对 spec §9 核销表区域豁免 DUP/STALE 检测或加 allowlist，核销表 fixture exit 0</span>
+        </td>
+        <td>ai（spec_flow + check_spec 退出码+字段正确性）</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C4</td>
+        <td>local_check 本地复刻 CI</td>
+        <td>
+          <span class="subitem"><span class="stag stag-base">基线</span>跑与 CI 相同 4 步同参数；base 双模式（--base HEAD/--pr-base）；任一 FAIL 立即停；退出码 0/2/1；不加 check_roles</span>
+        </td>
+        <td>ai（local_check 退出码+与 CI 1:1）</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C5</td>
+        <td>文档盲区 + 术语一致性</td>
+        <td>
+          <span class="subitem"><span class="stag stag-base">基线</span>check_docs 核心文件对 DUP 阈值 15；term-glossary.md 新建；check_terms 双词典源</span>
+          <span class="subitem"><span class="stag stag-bug">B3</span>check_text 也 pop term-glossary.md 作 allowlist；TERM_PAIRS 5 组硬编码术语对（五选一/五轨道、五条轨道/五轨道、代码审查员/代码安全员、审查员/监察员、需求澄清员/需求分析师）改为从 term-glossary.md 词典读；术语检测改动必 grep 全脚本同步；长期收敛到 check_terms 单一入口</span>
+        </td>
+        <td>ai（check_docs/check_terms 退出码+fixture 断言）</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C6</td>
+        <td>解冻重跑</td>
+        <td>
+          <span class="subitem"><span class="stag stag-base">基线</span>accept 阶段记录关联文件清单；改回 draft 再 verify 用 git diff 比对；动过须解冻原因+重跑结果；WARNING 升 ERROR；无 accept_commit 跳过</span>
+        </td>
+        <td>ai（check_spec verify 退出码+解冻记录校验）🔒</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C7</td>
+        <td>分轮可查 + 分轮纪律强化</td>
+        <td>
+          <span class="subitem"><span class="stag stag-base">基线</span>spec §1 澄清记录分轮 R1/R2…，每轮"查验+据此提问+用户答"三栏；check_spec --stage draft 校验分轮格式</span>
+          <span class="subitem"><span class="stag stag-flow">B10</span>team-mode.md 需求分析师卡强化"一次只问一个最关键问题+推荐答案+理由，上一轮答复后才进下一轮"；check_spec draft 启发式校验每轮单问题</span>
+        </td>
+        <td>ai（check_spec draft 退出码+分轮格式校验）</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C8</td>
+        <td>废弃契约流程标准化（A4）</td>
+        <td>
+          <span class="subitem"><span class="stag stag-meta">A4-C</span>check_spec 识别 signed→paused 转换；校验同日 pause 记录+复盘/memory-lesson 记录存在；校验旧 spec 维持 paused 不复活</span>
+          <span class="subitem"><span class="stag stag-meta">A4-find_spec</span>扩展 check_roles.find_spec 同日多候选过滤 status: paused，取唯一活跃 spec；全 paused 或多活跃才报错</span>
+          <span class="subitem"><span class="stag stag-meta">A4-SKILL</span>SKILL.md「契约作废与重新立项」小节标准化四步：作废判定→暂停→复盘→重新立项（旧 spec 不删不复活）</span>
+        </td>
+        <td>ai（check_spec/check_roles 退出码+记录校验）</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C9</td>
+        <td>先分析后契约（A5）</td>
+        <td>
+          <span class="subitem"><span class="stag stag-meta">A5-C</span>check_spec --stage draft 校验三点：spec §1/§2 引用方案分析产出物路径 + 路径文件存在 + 含决策树结构标记 token；任一不满足 → draft 不过 → 无法签约</span>
+          <span class="subitem"><span class="stag stag-meta">A5-P</span>SKILL.md Step 1 末尾硬约束"方案分析产出物未就绪不得进 Step 2 落盘 spec"；与 A7 咬合（产出物即 A7 HTML）</span>
+        </td>
+        <td>ai（check_spec draft 退出码+产出物校验）</td>
+      </tr>
+      <tr>
+        <td class="clause-id">C10</td>
+        <td>启动团队模式即派角色（A6+B11）</td>
+        <td>
+          <span class="subitem"><span class="stag stag-meta">A6-ai</span>team-mode.md 主脑卡含"启动即派角色清单"决策表（结构校验：清单存在+列明角色/顺序/禁止 stall）；check_roles --stage start 验 role_dispatch 完整性</span>
+          <span class="subitem"><span class="stag stag-meta">A6-human</span>主脑启动团队模式时未反复征求开工确认（用户亲身判定，平行旧 C8 human 验收）</span>
+          <span class="subitem"><span class="stag stag-flow">B11</span>P 规则 SKILL.md/team-mode.md 明示"启动即派角色，不得反复征求开工确认；用户已说'启动团队模式'=授权派角色"</span>
+        </td>
+        <td>ai（结构校验+role_dispatch）+ human（未 stall）</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">条款总数：10 条（C1-C10）。B7/B8 不进 spec（D7=A）。每条 C 的核销表按 D3=A 每 bug 独立一行（用例名独立），基线项亦独立一行。</p>
+</section>
+
+<!-- ========== 第五节：B7/B8 归属说明 ========== -->
+<section>
+  <h2>五、B7/B8 归属说明（不进 ship-it spec）</h2>
+  <div class="attrition-box">
+    <p><b>D7=A 锁定结论：</b>B7（goal 续轮催促）、B8（blocked 滥用）属全局 harness 使用纪律，不进 ship-it spec。</p>
+    <p><b>理由：</b></p>
+    <ul>
+      <li><b>守零耦合原则：</b>voided spec §2 非目标明确"不引入宿主依赖（保持零耦合 skill 形态）"。goal/blocked 是 harness 宿主机制，写进 ship-it C 条款等于让 ship-it 依赖宿主机制，违反 skill 自身设计原则。</li>
+      <li><b>不可机器验：</b>check_spec/check_docs 验不了 goal 续轮行为与 blocked 使用是否得当，立 C 条款只能是 theater（假绿），违反"执行者≠裁定者"红线。</li>
+      <li><b>更强执行：</b>全局 AGENTS.md 已是 harness 行为强制规范载体（进程安全、语言、ship-it 工作流都在那），B7/B8 补进去对所有会话/项目生效，比塞进 ship-it 内靠 human 验收强得多。</li>
+      <li><b>不遗漏：</b>B7/B8 仍在本次分析内（本节）、retrospective 内、memory-lesson 内留痕。"纳入分析"≠"必须成 C 条款"，分析得出"归属别处"是合法结论。</li>
+    </ul>
+    <p><b>本次范围内做的事：</b></p>
+    <ul>
+      <li><code>docs/reviews/2026-11-26-retrospective.md</code> 记录 B7/B8 作废根因与教训。</li>
+      <li><code>docs/reviews/2026-11-26-memory-lesson.md</code> 沉淀 B7/B8（C8 式防复发）。</li>
+    </ul>
+    <p><b>正式固化（本次外，需另起）：</b></p>
+    <ul>
+      <li>建议另起全局 AGENTS.md 改动（独立 spec，"改规则者受规则约束"），把"goal 续轮不得在等用户输入时催促""blocked 仅限技术死锁，等用户输入不算"写进全局强制规范。</li>
+      <li>由 lead 立 team_task 跟踪该项，避免石沉大海（本方案不替 lead 决定 team_task 细节，仅建议）。</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  v5.2.1 重做方案 v2 · 需求分析师 analyst2 产出 · 2026-11-26<br>
+  经 D1-D9 共 8 个决策点逐轮与用户确认后生成 · 待主脑 lead 审核后呈用户确认<br>
+  下一步：用户确认本方案 → 进入 ship-it Step 2 落盘新 spec <code>ship-it/docs/specs/2026-11-26-v5.2.1-reliability-fixes-redo.md</code>
+</footer>
+
+</div>
+</body>
+</html>

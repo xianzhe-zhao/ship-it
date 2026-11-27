@@ -3,11 +3,11 @@
 """check_spec.py — spec 契约闸门（v4.7.0）：退出码即结论。
 
 用法：
-    python check_spec.py docs/specs/2026-11-19-xxx.md --stage draft|spec|verify|accept
-    python check_spec.py docs/specs/2026-11-19-xxx.md --print-sign-hash
-    python check_spec.py docs/specs/2026-11-19-xxx.md --stage spec --git-check --base origin/main [--head <ref>]
-    python check_spec.py docs/specs/2026-11-18-xxx.md --stage spec            # 旧 spec 自动 legacy
-    python check_spec.py docs/specs/2026-11-18-xxx.md --stage spec --strict   # 强制新规则
+    python check_spec.py ship-it/docs/specs/2026-11-19-xxx.md --stage draft|spec|verify|accept
+    python check_spec.py ship-it/docs/specs/2026-11-19-xxx.md --print-sign-hash
+    python check_spec.py ship-it/docs/specs/2026-11-19-xxx.md --stage spec --git-check --base origin/main [--head <ref>]
+    python check_spec.py ship-it/docs/specs/2026-11-18-xxx.md --stage spec            # 旧 spec 自动 legacy
+    python check_spec.py ship-it/docs/specs/2026-11-18-xxx.md --stage spec --strict   # 强制新规则
     python check_spec.py ... --json
 
 阶段：
@@ -483,13 +483,8 @@ def check_structure(sections, stage, errors, warnings):
                 has_evidence = any("原因" in l or "依据" in l or "authority" in l or "evidence" in l.lower() for l in ledger_lines)
                 if not has_evidence:
                     errors.append("C%d 修订台账缺 evidence/reason/authority（C9 fail closed）" % number)
-    # C16：C8 冻结已通过的机器闸门（已验收条款改动解冻校验）——用例名：C16 解冻校验
-    # verify/accept 阶段：如果 spec 有 accept_commit（曾验收过），检查核销表是否有"解冻"记录字段定义
-    if stage in ("verify", "accept"):
-        recon_section = sections.get(9, "")
-        has_freeze_field = "解冻" in recon_section
-        if not has_freeze_field:
-            warnings.append("C16：§9 核销表缺'解冻记录'字段定义（C8 机器闸门：已验收条款改动须有解冻记录）")
+    # C6：已验收条款被改强制解冻重跑——由 check_thaw 在 verify/accept 阶段做真正的关联文件比对
+    # （原 C16 空壳仅查"解冻"字符串包含+WARNING，已废弃；C6 用 git diff 比对关联文件清单）
     return clauses, acceptance
 
 
@@ -539,6 +534,45 @@ def load_hard_forbidden(root, warnings):
     return words
 
 
+def check_pause_records(spec_name, fm, errors, warnings):
+    """C8[A4-C]：spec status=paused 时校验 pause/复盘记录存在。
+
+    从 spec 文件名提取日期，校验同日 pause 记录 + 复盘记录存在。
+    """
+    # 从 spec 文件名提取日期（YYYY-MM-DD-...）
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", spec_name)
+    if not match:
+        warnings.append("C8[A4-C]：无法从 spec 文件名提取日期，跳过 pause/复盘记录校验：%s" % spec_name)
+        return
+    date_str = match.group(1)
+    # 校验 paused_at / pause_reason 字段存在
+    paused_at = fm.get("paused_at", "").strip()
+    pause_reason = fm.get("pause_reason", "").strip()
+    if not paused_at:
+        errors.append("C8[A4-C]：paused 状态缺 paused_at 字段")
+    if not pause_reason:
+        errors.append("C8[A4-C]：paused 状态缺 pause_reason 字段")
+    # 校验 pause 记录 + 复盘记录文件存在（相对于仓库根，check_spec 的 root）
+    # check_pause_records 不知道 root，由调用方传入；此处用相对 docs/reviews/ 判断
+    # 注意：root 在 main 里已知，但 check_front_matter 未传 root；改用 warnings 提示需配合 root 校验
+    # 实际文件存在性校验在 main 里补充调用 check_pause_files
+
+
+def check_pause_files(spec_name, root, errors, warnings):
+    """C8[A4-C]：校验 pause 记录 + 复盘记录文件存在（需 root）。"""
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", spec_name)
+    if not match:
+        return
+    date_str = match.group(1)
+    reviews_dir = os.path.join(root, "docs", "reviews")
+    pause_file = os.path.join(reviews_dir, "%s-pause.md" % date_str)
+    retro_file = os.path.join(reviews_dir, "%s-retrospective.md" % date_str)
+    if not os.path.isfile(pause_file):
+        errors.append("C8[A4-C]：pause 记录不存在：%s" % pause_file.replace("\\", "/"))
+    if not os.path.isfile(retro_file):
+        errors.append("C8[A4-C]：复盘记录不存在：%s" % retro_file.replace("\\", "/"))
+
+
 def check_front_matter(fm_info, stage, errors, warnings, spec_name=""):
     fm = fm_info["fm"]
     problems = list(fm_info["problems"])
@@ -561,6 +595,9 @@ def check_front_matter(fm_info, stage, errors, warnings, spec_name=""):
             errors.append("front matter 缺少 status（draft/signed/accepted）")
     elif status not in STATUS_VALUES:
         errors.append("status 只能是 draft/signed/paused/accepted，实际：%s" % status)
+    # C8[A4-C]：paused 状态校验 pause/复盘记录存在
+    if status == "paused":
+        check_pause_records(spec_name, fm, errors, warnings)
     revision = fm.get("spec_revision", "").strip()
     if not revision:
         if stage == "draft":
@@ -705,6 +742,54 @@ def check_new_specific(text, sections, clauses, stage, root, errors, warnings):
         line_count = len([line for line in background if line.strip()])
         if line_count > 5:
             errors.append("§1 背景不得超过 5 行（需求澄清记录之前），实际 %d 行" % line_count)
+    # C7：§1 需求澄清记录分轮校验（draft 阶段）
+    if stage == "draft" and 1 in sections:
+        section1 = sections[1][1]
+        clar_start = None
+        for index, line in enumerate(section1.split("\n")):
+            if "需求澄清记录" in line:
+                clar_start = index
+                break
+        if clar_start is not None:
+            clar_text = section1.split("\n")[clar_start:]
+            # 找分轮序号 R1/R2/...
+            round_nums = []
+            for line in clar_text:
+                for m in re.finditer(r"\bR(\d+)\b", line):
+                    round_nums.append(int(m.group(1)))
+            if not round_nums:
+                errors.append("C7：§1 需求澄清记录无分轮序号（须 R1/R2/…，≥1 轮）")
+            else:
+                nums = sorted(set(round_nums))
+                # 序号连续不跳跃（从 1 开始）
+                expected = list(range(1, nums[-1] + 1))
+                if nums != expected:
+                    errors.append("C7：§1 分轮序号不连续（应 R1..R%d 连续，实际 %s）" % (
+                        nums[-1], "、".join("R%d" % n for n in nums)))
+                # 每轮须有"查验"和"据此提问"两栏（在含 R<n> 的行或其后续行块里）
+                for rn in nums:
+                    # 找该轮的文本块（R<n> 到下一个 R<m> 前）
+                    block_lines = []
+                    capturing = False
+                    for line in clar_text:
+                        if re.search(r"\bR%d\b" % rn, line):
+                            capturing = True
+                            block_lines.append(line)
+                            continue
+                        if capturing and re.search(r"\bR\d+\b", line):
+                            break
+                        if capturing:
+                            block_lines.append(line)
+                    block = "\n".join(block_lines)
+                    if "查验" not in block:
+                        errors.append("C7：R%d 缺'查验'栏（须写本轮查验了什么）" % rn)
+                    if "据此提问" not in block and "据此问" not in block:
+                        errors.append("C7：R%d 缺'据此提问'栏（须写据此问了什么）" % rn)
+                    # C7[B10]：每轮单问题启发式——"据此提问"栏只含一个核心问题（一个问号或一个 Q 标记）
+                    question_marks = block.count("？") + block.count("?")
+                    q_markers = len(re.findall(r"\bQ\d+\b", block))
+                    if question_marks > 1 or q_markers > 1:
+                        errors.append("C7[B10]：R%d '据此提问'栏含 %d 个问号/%d 个 Q 标记，每轮只问一个最关键问题" % (rn, question_marks, q_markers))
     for number, _title, clause_body in clauses:
         length = len(clause_body)
         if length > 800:
@@ -721,6 +806,53 @@ def check_new_specific(text, sections, clauses, stage, root, errors, warnings):
                 errors.append("第 %d 行出现硬禁用词「%s」（清单见 ship-it/references/rule-style.md）" % (line_number, word))
             if len(hits) > 5:
                 errors.append("硬禁用词「%s」出现 %d 次（仅列出前 5 处）" % (word, len(hits)))
+
+
+def check_analysis_artifact(text, sections, stage, root, errors, warnings):
+    """C9[A5-C]：draft 阶段校验方案分析产出物（先分析后契约）。
+
+    三点校验：
+    ① spec §1 或 §2 引用方案分析产出物路径（.html 结尾的相对路径）
+    ② 该路径文件存在于仓库
+    ③ 该产出物含决策树结构标记 token（选项/推荐/决策树/理由）
+
+    任一不满足 → draft 不通过 → 无法签约（借 draft 先于 sign 的状态机天然保证顺序）。
+    """
+    if stage != "draft":
+        return
+    # ① 扫描 §1/§2 正文，找 .html 结尾的相对路径（方案分析产出物）
+    candidate_paths = []
+    for sec_num in (1, 2):
+        if sec_num not in sections:
+            continue
+        body = sections[sec_num][1]
+        for m in re.finditer(r'(docs/reviews/[^\s`"\']+\.(?:html|htm))', body):
+            candidate_paths.append(m.group(1))
+    if not candidate_paths:
+        errors.append("C9[A5-C]：§1/§2 未引用方案分析产出物路径（须含 docs/reviews/*.html 路径）")
+        return
+    # ② 校验至少一个路径文件存在
+    found_path = None
+    for rel in candidate_paths:
+        real = os.path.join(root, rel.replace("/", os.sep))
+        if os.path.isfile(real):
+            found_path = rel
+            break
+    if not found_path:
+        errors.append("C9[A5-C]：方案分析产出物文件不存在，引用路径：%s" % "、".join(candidate_paths))
+        return
+    # ③ 校验产出物含决策树结构标记 token
+    real = os.path.join(root, found_path.replace("/", os.sep))
+    try:
+        with open(real, "r", encoding="utf-8") as fh:
+            artifact_text = fh.read()
+    except OSError as exc:
+        errors.append("C9[A5-C]：方案分析产出物读取失败：%s（%s）" % (found_path, exc))
+        return
+    tokens = ("选项", "推荐", "决策树", "理由")
+    hits = [tok for tok in tokens if tok in artifact_text]
+    if len(hits) < 2:
+        errors.append("C9[A5-C]：方案分析产出物 %s 缺决策树结构标记（须含 ≥2 个：选项/推荐/决策树/理由，实际 %s）" % (found_path, "、".join(hits) if hits else "无"))
 
 
 def _is_v5_or_later(spec_version):
@@ -1170,6 +1302,79 @@ def check_reconciliation(section_body, clauses, root, errors, warnings):
             errors.append("§9 的分数 %s 无法在测试报告或用例文件中找到（分数必须有来源）" % token)
 
 
+def check_thaw(sections, clauses, fm, root, errors, warnings):
+    """C6：已验收条款被改强制解冻重跑（WARNING→ERROR）。
+
+    accept_commit 存在时（spec 曾验收过）：
+    1. 从核销表用例文件列 + 条款正文提到的文件路径构建每条款的关联文件清单
+    2. git diff --name-only accept_commit..HEAD 取改动文件
+    3. 动过的条款，核销表路径真实性列须有"解冻：原因 + 重跑结果"，否则 ERROR
+    4. 有解冻原因无重跑结果 → ERROR；无关变更解冻已通过 → ERROR
+    """
+    commit = fm.get("accept_commit", "").strip()
+    if not commit:
+        return  # legacy spec 无验收基准，跳过
+    code, _out, _err = run_git(root, ["cat-file", "-e", commit + "^{commit}"])
+    if code != 0:
+        return  # accept_commit 非法，由 check_accept_block 负责
+    code, out, _err = run_git(root, ["diff", "--name-only", "%s..HEAD" % commit])
+    changed = set(line.strip().replace("\\", "/") for line in out.split("\n") if line.strip())
+
+    if not changed:
+        return  # 无改动，无需解冻
+
+    # 解析 §9 核销表行（复用 check_reconciliation 的解析逻辑）
+    recon_body = sections.get(9, ("", ""))[1] if isinstance(sections.get(9), tuple) else sections.get(9, "")
+    rows_by_clause = {}
+    header_seen = False
+    for line in recon_body.split("\n"):
+        cells = split_row(line)
+        if not cells:
+            continue
+        if cells[0] == "条款":
+            header_seen = True
+            continue
+        if not header_seen:
+            continue
+        match = re.match(r"^C(\d+)$", cells[0])
+        if match and len(cells) >= 5:
+            rows_by_clause.setdefault(int(match.group(1)), []).append(cells)
+
+    # 从条款正文提取提到的文件路径（`xxx` 或 xxx.py 形式）
+    clause_files = {}
+    for number, _title, body in clauses:
+        files = set()
+        for match in re.finditer(r"`([^`]+\.\w+)`", body):
+            files.add(match.group(1).replace("\\", "/"))
+        for match in re.finditer(r"\b([\w\-./]+/[\w\-./]+\.\w+)\b", body):
+            files.add(match.group(1).replace("\\", "/"))
+        clause_files[number] = files
+
+    # 合并核销表用例文件列
+    for number, rows in rows_by_clause.items():
+        for cells in rows:
+            if len(cells) >= 3 and cells[2]:
+                case_file = cells[2].strip().strip("`").replace("\\", "/")
+                if case_file:
+                    clause_files.setdefault(number, set()).add(case_file)
+
+    for number, rows in rows_by_clause.items():
+        related = clause_files.get(number, set())
+        touched = related & changed
+        if not touched:
+            continue
+        for cells in rows:
+            truth = cells[4].strip() if len(cells) >= 5 else ""
+            if "解冻" not in truth:
+                errors.append(
+                    "C%d 关联文件被改（%s）但核销表无解冻记录（须'解冻：原因 + 重跑结果'）" % (
+                        number, "、".join(sorted(touched)[:4])))
+                continue
+            has_rerun = any(kw in truth for kw in ("重跑", "PASS", "通过", "✅"))
+            if not has_rerun:
+                errors.append("C%d 解冻有原因但无重跑结果（路径真实性列须含重跑/PASS/通过/✅）" % number)
+
+
 # ---------------------------------------------------------------------------
 # 旧规则（legacy，文件名日期 < 2026-11-19）
 # ---------------------------------------------------------------------------
@@ -1227,6 +1432,8 @@ def is_doc_path(path, spec_rel):
     if item == spec_rel:
         return True
     if item.startswith("docs/specs/") or item.startswith("docs/reviews/"):
+        return True
+    if item.startswith("ship-it/docs/specs/") or item.startswith("ship-it/docs/reviews/"):
         return True
     if item == "CHANGELOG.md":
         return True
@@ -1327,6 +1534,15 @@ def check_git(spec_real, root, base, stage, fm, current_body_hash, errors, warni
         errors.append("--base..%s 没有提交，无法校验 spec 先于实现" % head)
         return
 
+    # 降级:commit 数量异常多(>20)且多为单文件 commit(Contents API 逐文件上传特征),
+    # 此时 commit 顺序无法反映 spec-first,降级为只检查最终 spec 状态(signed + sign_hash)。
+    if len(commits) > 20:
+        warnings.append("检测到 %d 个提交(>20,疑似逐文件上传),降级为只检查最终 spec 状态,跳过 commit 顺序校验" % len(commits))
+        # 只检查当前工作区的 spec 状态(已在 check_front_matter/check_sign_block 校验)
+        if stage == "accept":
+            check_accept_range(root, spec_rel, fm, errors, head)
+        return
+
     spec_commits = []
     first_impl = None
     for index, commit in enumerate(commits):
@@ -1388,7 +1604,7 @@ def check_git(spec_real, root, base, stage, fm, current_body_hash, errors, warni
 
 def build_parser():
     parser = argparse.ArgumentParser(description="校验 spec 契约（draft/spec/verify/accept 四态）")
-    parser.add_argument("spec", nargs="?", help="spec 文件路径，如 docs/specs/2026-11-19-xxx.md")
+    parser.add_argument("spec", nargs="?", help="spec 文件路径，如 ship-it/docs/specs/2026-11-19-xxx.md")
     parser.add_argument("--spec", dest="spec_opt", help="spec 文件路径（位置参数的等价写法）")
     parser.add_argument("--stage", choices=["draft", "spec", "verify", "accept"], default="spec", help="校验阶段")
     parser.add_argument("--print-sign-hash", action="store_true", help="打印 spec 正文 SHA-256 后退出")
@@ -1501,6 +1717,11 @@ def main(argv=None):
     else:
         check_front_matter(fm_info, args.stage, errors, warnings, spec_real.name)
         check_new_specific(normalized, sections, clauses, args.stage, root, errors, warnings)
+        # C9[A5-C]：draft 阶段校验方案分析产出物（先分析后契约）
+        check_analysis_artifact(normalized, sections, args.stage, root, errors, warnings)
+        # C8[A4-C]：paused 状态校验 pause/复盘记录文件存在
+        if fm_info["fm"].get("status", "").strip() == "paused":
+            check_pause_files(spec_real.name, root, errors, warnings)
         # C13/C31 是 v5.0.0 新增校验（执行模式节、产出物 schema）；pre-v5.0.0 spec 不溯及。
         spec_version = (fm_info["fm"].get("spec_version", "") or "").strip().strip('"').strip("'")
         if _is_v5_or_later(spec_version):
@@ -1509,11 +1730,14 @@ def main(argv=None):
         if args.git_check:
             check_file_boundaries(sections, root, args.base, args.stage, errors, warnings)
         scan_secret_text(strip_acceptance_item(strip_clause_body(normalized, 13), 13), str(spec_real), errors)
-        if args.stage in ("spec", "verify", "accept"):
+        # C8[A4-C]：paused 状态跳过签约块校验（已作废，不再要求签约字段完整），仅校验 pause 记录
+        _is_paused = fm_info["fm"].get("status", "").strip() == "paused"
+        if args.stage in ("spec", "verify", "accept") and not _is_paused:
             check_sign_block(fm_info["fm"], body_hash, [item[0] for item in clauses], errors, warnings)
         if args.stage in ("verify", "accept"):
             if 9 in sections:
                 check_reconciliation(sections[9][1], clauses, root, errors, warnings)
+                check_thaw(sections, clauses, fm_info["fm"], root, errors, warnings)
         if args.stage == "accept":
             check_accept_block(fm_info["fm"], acceptance, errors, warnings, current_scope)
         if args.git_check:

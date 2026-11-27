@@ -4,7 +4,7 @@
 
 用法：
     python check_roles.py --date 2026-11-19 --stage start
-    python check_roles.py --date 2026-11-19 --stage pause --spec docs/specs/2026-11-19-xxx.md
+    python check_roles.py --date 2026-11-19 --stage pause --spec ship-it/docs/specs/2026-11-19-xxx.md
     python check_roles.py --date 2026-11-19 --stage sign|verify|accept [--reviews-dir docs/reviews] [--spec ...]
     python check_roles.py --date 2026-11-19 --stage verify --json
 
@@ -679,6 +679,8 @@ def is_impl_path(path):
     item = path.replace("\\", "/")
     if item.startswith("docs/specs/") or item.startswith("docs/reviews/"):
         return False
+    if item.startswith("ship-it/docs/specs/") or item.startswith("ship-it/docs/reviews/"):
+        return False
     if item == "CHANGELOG.md":
         return False
     return True
@@ -719,7 +721,7 @@ def first_impl_commit(root, spec_rel):
 def resolve_spec(args, root, errors, required=False):
     if args.spec:
         return resolve_in_root(args.spec, root, "spec 路径", errors, must_exist=True)
-    pattern = "docs/specs/%s-*.md" % args.date
+    pattern = "ship-it/docs/specs/%s-*.md" % args.date
     candidates = sorted(Path(root).glob(pattern))
     if len(candidates) == 1:
         return Path(os.path.realpath(str(candidates[0])))
@@ -730,7 +732,26 @@ def resolve_spec(args, root, errors, required=False):
         else:
             errors.append(message)
         return None
-    errors.append("找到多个 %s 的 spec：%s；请用 --spec 指定唯一契约" % (args.date, "、".join(item.name for item in candidates)))
+    # C8[A4-find_spec]：同日多候选时过滤 status: paused，取唯一活跃 spec
+    active_candidates = []
+    for cand in candidates:
+        text, read_error = read_utf8(cand)
+        if read_error:
+            continue
+        info = split_front_matter(text)
+        if not info["has"]:
+            continue
+        status = strip_cell(info["fm"].get("status", ""))
+        if status != "paused":
+            active_candidates.append(cand)
+    if len(active_candidates) == 1:
+        return Path(os.path.realpath(str(active_candidates[0])))
+    if not active_candidates:
+        errors.append("找到 %d 个 %s 的 spec 但全部已 paused，无活跃契约：%s；请用 --spec 指定" % (
+            len(candidates), args.date, "、".join(item.name for item in candidates)))
+        return None
+    errors.append("找到多个 %s 的活跃 spec（已过滤 paused）：%s；请用 --spec 指定唯一契约" % (
+        args.date, "、".join(item.name for item in active_candidates)))
     return None
 
 
@@ -1163,7 +1184,7 @@ def build_parser():
     parser.add_argument("--date", required=True, help="审查日期，格式 YYYY-MM-DD")
     parser.add_argument("--stage", required=True, choices=["start", "pause", "sign", "verify", "accept"], help="闸门阶段")
     parser.add_argument("--reviews-dir", default="docs/reviews", help="审查报告目录（默认 docs/reviews）")
-    parser.add_argument("--spec", help="spec 路径（默认 docs/specs/<date>-*.md）")
+    parser.add_argument("--spec", help="spec 路径（默认 ship-it/docs/specs/<date>-*.md）")
     parser.add_argument("--first-write", default="tmp/first-write.json", help="C6 首写标记（默认 tmp/first-write.json）")
     parser.add_argument("--test-report", help="C11 测试报告（默认 docs/reviews/<date>-test-report.md）")
     parser.add_argument("--json", action="store_true", help="输出 JSON")

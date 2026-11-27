@@ -5,7 +5,7 @@
 用法：
     python ship-it/scripts/check_docs.py --root .
     python ship-it/scripts/check_docs.py --root . --json
-    python ship-it/scripts/check_docs.py --root . --spec docs/specs/<spec>.md
+    python ship-it/scripts/check_docs.py --root . --spec ship-it/docs/specs/<spec>.md
 
 扫描集（相对 --root）：
     ship-it/SKILL.md、README.md、ship-it/references/spec-template.md、
@@ -54,6 +54,8 @@ EXPECTED_STEPS = 9
 DEFAULT_MAX_LINE = 500
 SPEC_MAX_LINE = 800  # C11：每条条款 ≤800 字符；已签约 spec 不再改行
 DUPLICATE_MIN_CHARS = 30
+CORE_PAIR_MIN_CHARS = 15  # C5：核心文件对（SKILL↔team-mode↔spec-template）独立阈值
+CORE_PAIR_FILES = ("ship-it/SKILL.md", "ship-it/references/team-mode.md", "ship-it/references/spec-template.md")
 CHANGELOG_47_LIMIT = 300
 CHANGELOG_MAJOR_LIMIT = 600  # major 版本（主版本号变更，如 5.0.0）变更多，放宽到 600
 CANONICAL_MARKER = "刚才的说明可能造成误解"
@@ -212,6 +214,9 @@ def spec_regions(lines):
             regions.append((index + 1, section_end(lines, index, level), "spec 边界表"))
         elif re.match(r"^##\s*8[.、\s]", line):
             regions.append((index + 1, section_end(lines, index, level), "spec §8 三问状态机"))
+        elif re.match(r"^##\s*9[.、\s]", line):
+            # C3[B6]：§9 核销表区域豁免 DUP/STALE 检测（表格化重复文本是设计，非文档质量问题）
+            regions.append((index + 1, section_end(lines, index, level), "spec §9 核销表"))
     return regions
 
 
@@ -254,16 +259,16 @@ def resolve_spec(root, spec_arg, errors, warnings):
             errors.append("--spec 不存在：%s" % spec_arg)
             return None
         return rel_posix(real, root)
-    # 默认：扫 docs/specs/*.md，取文件名版本号最高者（SemVer）；并列取文件名日期最新；
+    # 默认：扫 ship-it/docs/specs/*.md，取文件名版本号最高者（SemVer）；并列取文件名日期最新；
     # 无版本号降级取文件名日期最新（同一天取 mtime 最新）
     candidates = []
-    specs_dir = root / "docs" / "specs"
+    specs_dir = root / "ship-it" / "docs" / "specs"
     if specs_dir.is_dir():
         for item in sorted(specs_dir.glob("*.md")):
             if re.match(r"^\d{4}-\d{2}-\d{2}-", item.name):
                 candidates.append(item)
     if not candidates:
-        warnings.append("docs/specs 下没有日期命名的 spec，跳过条款/验收计数检查")
+        warnings.append("ship-it/docs/specs 下没有日期命名的 spec，跳过条款/验收计数检查")
         return None
     # 优先按文件名版本号选；无版本号的 spec 不参与版本号比较
     with_version = [(parse_spec_version_from_name(c.name), c) for c in candidates]
@@ -273,7 +278,7 @@ def resolve_spec(root, spec_arg, errors, warnings):
         best = max(versioned, key=lambda vc: (vc[0], vc[1].name))[1]
     else:
         # 全部无版本号：降级取文件名日期最新（同一天取 mtime 最新）
-        warnings.append("docs/specs 下 spec 均无文件名版本号，降级取文件名日期最新（同一天取 mtime 最新）")
+        warnings.append("ship-it/docs/specs 下 spec 均无文件名版本号，降级取文件名日期最新（同一天取 mtime 最新）")
         best = max(candidates, key=lambda c: (c.name, c.stat().st_mtime))
     real = Path(os.path.realpath(str(best)))
     if not is_inside(real, root):
@@ -683,8 +688,13 @@ def collect_duplicates(documents, spec_rel=None):
             stripped = line.strip()
             if TABLE_SEP_RE.match(stripped):
                 continue
+            # C5：核心文件的表格行（以 | 开头）跳过收集——模板/示例的结构性表头重复
+            if rel in CORE_PAIR_FILES and stripped.startswith("|") and stripped.endswith("|"):
+                continue
             normalized = normalize_text(line)
-            if len(normalized) < DUPLICATE_MIN_CHARS:
+            # C5：核心文件用更低阈值收集（15），普通文件维持 30
+            min_chars = CORE_PAIR_MIN_CHARS if rel in CORE_PAIR_FILES else DUPLICATE_MIN_CHARS
+            if len(normalized) < min_chars:
                 continue
             if not re.search(r"[\w\u4e00-\u9fff]", normalized):
                 continue
@@ -700,13 +710,18 @@ def collect_duplicates(documents, spec_rel=None):
         locs = set(item[0] for item in occurrences)
         if spec_rel and locs <= {spec_rel, TEMPLATE_REL} and len(locs) == 2:
             continue
+        # C5：非核心文件对的短重复（<30）不报，只核心文件对间用 15 阈值
+        is_core_pair = all(loc in CORE_PAIR_FILES for loc in locs)
+        effective_min = CORE_PAIR_MIN_CHARS if is_core_pair else DUPLICATE_MIN_CHARS
+        if len(normalized) < effective_min:
+            continue
         locations = sorted(set(item[0] for item in occurrences))
         duplicates.append({
             "normalized": normalized[:160],
             "files": locations,
             "lines": [{"file": rel, "line": line} for rel, line in occurrences[:12]],
             "message": "重复（规范化后 >=%d 字符，出现 %d 次）：%s；位置 %s" % (
-                DUPLICATE_MIN_CHARS,
+                effective_min,
                 len(occurrences),
                 normalized[:80],
                 "、".join("%s:%d" % (rel, line) for rel, line in occurrences[:6]),
@@ -1070,7 +1085,7 @@ def check_analyst_grill_mechanisms(documents, errors, warnings):
 def build_parser():
     parser = argparse.ArgumentParser(description="全文一致性与去废话闸门（v4.7.2 / C18）")
     parser.add_argument("--root", default=".", help="仓库根（默认当前目录）")
-    parser.add_argument("--spec", help="当前 spec 路径（默认 docs/specs 下日期最大的 spec）")
+    parser.add_argument("--spec", help="当前 spec 路径（默认 ship-it/docs/specs 下日期最大的 spec）")
     parser.add_argument("--max-line", type=int, default=DEFAULT_MAX_LINE, help="长行阈值（docs 默认 500 字符；spec 用 800，C11 条款上限）")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     return parser
@@ -1149,6 +1164,40 @@ def main(argv=None):
         }
         return emit(result, args)
     result["root"] = str(root)
+
+    # C2：EXPECTED_VERSION 动态读 ship-it/SKILL.md frontmatter（单一事实源）
+    global EXPECTED_VERSION
+    skill_path = root / "ship-it" / "SKILL.md"
+    if skill_path.is_file():
+        try:
+            skill_lines = skill_path.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            errors.append("读取 ship-it/SKILL.md 失败：%s" % exc)
+            result["stats"] = {
+                "files": 0, "lines": 0, "stale": 0, "duplicates": 0, "duplicate": 0,
+                "long": 0, "contradictions": 0, "contradiction": 0,
+                "clause_count": 0, "acceptance_count": 0, "allowlist": 0,
+            }
+            return emit(result, args)
+        dynamic_version = extract_version("ship-it/SKILL.md", skill_lines)
+        if not dynamic_version or not re.match(r"^\d+\.\d+\.\d+$", dynamic_version):
+            errors.append(
+                "EXPECTED_VERSION 动态读失败：ship-it/SKILL.md frontmatter 无 version 或格式非法（应为 \\d+.\\d+.\\d+），fail closed")
+            result["stats"] = {
+                "files": 0, "lines": 0, "stale": 0, "duplicates": 0, "duplicate": 0,
+                "long": 0, "contradictions": 0, "contradiction": 0,
+                "clause_count": 0, "acceptance_count": 0, "allowlist": 0,
+            }
+            return emit(result, args)
+        EXPECTED_VERSION = dynamic_version
+    else:
+        errors.append("ship-it/SKILL.md 不存在，EXPECTED_VERSION 无法动态读取（fail closed）")
+        result["stats"] = {
+            "files": 0, "lines": 0, "stale": 0, "duplicates": 0, "duplicate": 0,
+            "long": 0, "contradictions": 0, "contradiction": 0,
+            "clause_count": 0, "acceptance_count": 0, "allowlist": 0,
+        }
+        return emit(result, args)
 
     spec_rel = resolve_spec(root, args.spec, errors, warnings)
     result["spec"] = spec_rel or ""

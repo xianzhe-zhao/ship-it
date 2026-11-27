@@ -1,5 +1,9 @@
 # Changelog — ship-it
 
+## 5.2.1（2026-11-26）
+
+**可靠性修复（patch，8 条）**：针对 v5.2.0 的 13 出错点与 4 结构性缺陷。C1 spec 目录统一 `ship-it/docs/specs/`（迁 13 旧 spec+前缀对齐+ALLOW 双保留）；C2 EXPECTED_VERSION 动态读 SKILL.md（读不到 exit 1）；C3 `spec_flow.py` sign/accept/reconcile（自校验+回滚）；C4 `local_check.py` 1:1 复刻 CI 四步；C5 文档盲区（DUP 核心对阈值 15+`term-glossary.md`）；C6 已验收条款被改强制解冻重跑（WARNING→ERROR）🔒；C7 分轮追问+先查验塑形可查；C8 出错点沉淀记忆。spec：`ship-it/docs/specs/2026-11-26-v5.2.1-reliability-fixes.md`。patch。
+
 ## 5.2.0（2026-11-26）
 
 **开发流程增强（minor，17 条优化）**：借鉴 omd/trellis/ship-it 三方对比，落地 17 条契约条款。核心：C1 5 变更轨道+步骤序列；C2 性能工程师（咨询顾问模式）；C3 前端演示页；C4 bug 复现契约；C5 check_writes_before_sign.py 事前拦截；C6 ast-grep/LSP 影响面；C7 代码安全员出有依据方案（P0 不对称否决）；C8 中途变更三分流+冻结+backlog；C9 criterion amendments（revision+台账防改弱）；C10 歧义度自评；C11 ai/human 核销；C12 局部 Git 校验；C13 降级系统化；C14 leaf-guard（DSH 建议启用）；C15 文档质量检查（机器+裁判员 J2）；C16 C8 机器闸门；C17 条款-实现一致性。spec：docs/specs/2026-11-25-v5.2.0-tracks-roles-degradation.md。minor。
