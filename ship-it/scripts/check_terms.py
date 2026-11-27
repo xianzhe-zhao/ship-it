@@ -32,6 +32,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 GLOSSARY_REL = "ship-it/references/role-glossary.md"
+TERM_GLOSSARY_REL = "ship-it/references/term-glossary.md"  # C5：流程术语词典
 BODY_FILES = [
     "ship-it/SKILL.md",
     "ship-it/references/team-mode.md",
@@ -44,6 +45,7 @@ ALLOWLIST_FILES = [
     "CHANGELOG.md",
 ]
 ALLOWLIST_GLOBS = [
+    "ship-it/docs/specs/*.md",
     "docs/specs/*.md",
 ]
 SEP_RE = re.compile(r"^:?-+:?$")
@@ -68,12 +70,12 @@ def read_utf8(path):
         return None, "读取失败：%s" % exc
 
 
-def parse_glossary(text):
-    """解析 role-glossary.md 表格，返回 (authoritative_names, aliases)。
+def parse_glossary(text, header_key="角色名"):
+    """解析 glossary 表格，返回 (authoritative_names, aliases)。
 
-    表头行含 角色名；其下一行为 |---|---|---| 分隔行；随后连续的 | ... | 行为
-    数据行，第一列为权威角色名，第二列为别名（历史），多别名以 / 或 、 分隔，
-    "-" 表示无别名。
+    表头行含 header_key（默认"角色名"，term-glossary 用"术语"）；其下一行为 |---|---|---|
+    分隔行；随后连续的 | ... | 行为数据行，第一列为权威名，第二列为别名（历史），
+    多别名以 / 或 、 分隔，"-" 表示无别名。
     """
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     authoritative = []
@@ -83,7 +85,7 @@ def parse_glossary(text):
         s = line.strip()
         if s.startswith("|") and s.endswith("|"):
             cells = [c.strip() for c in s.strip("|").split("|")]
-            if cells and "角色名" in cells[0]:
+            if cells and header_key in cells[0]:
                 header_idx = i
                 break
     if header_idx is None:
@@ -125,8 +127,12 @@ def is_allowlisted(rel):
     return False
 
 
-def scan_text(rel, text, aliases):
-    """返回命中列表；长别名优先，覆盖与之重叠的短别名区间，避免重复报告。"""
+def scan_text(rel, text, aliases, authoritative=None):
+    """返回命中列表；长别名优先，覆盖与之重叠的短别名区间，避免重复报告。
+
+    C5：先扫权威名占位（covered），再扫别名时跳过被权威名覆盖的区间，
+    避免"咨询顾问模式"（权威）被"顾问模式"（别名）子串误命中。
+    """
     hits = []
     ordered = sorted(set(aliases), key=len, reverse=True)
     if not ordered:
@@ -137,6 +143,17 @@ def scan_text(rel, text, aliases):
         line_starts.append(pos)
         pos += len(line) + 1
     covered = []
+    # C5：先扫权威名，占位 covered，防止别名作为权威名子串误命中
+    if authoritative:
+        for term in sorted(set(authoritative), key=len, reverse=True):
+            start = 0
+            while True:
+                idx = text.find(term, start)
+                if idx == -1:
+                    break
+                end = idx + len(term)
+                covered.append((idx, end))
+                start = end
     for term in ordered:
         start = 0
         while True:
@@ -234,7 +251,7 @@ def main(argv=None):
         result["ok"] = not errors
         return emit(result, args)
 
-    authoritative[:], aliases[:] = parse_glossary(gtext)
+    authoritative[:], aliases[:] = parse_glossary(gtext, "角色名")
     if not authoritative:
         errors.append("词典解析失败：未在 %s 找到角色名表格（表头需含 角色名 列）" % GLOSSARY_REL)
     elif len(authoritative) < 8:
@@ -242,6 +259,24 @@ def main(argv=None):
             len(authoritative), "、".join(authoritative)))
     if not aliases:
         warnings.append("词典未解析到别名（旧名），正文旧名检测无目标，视为 PASS")
+
+    # C5：加载流程术语词典（term-glossary.md），缺失时 WARN 不阻断
+    term_glossary_path = root / TERM_GLOSSARY_REL
+    if term_glossary_path.is_file():
+        tgtext, tgerr = read_utf8(term_glossary_path)
+        if tgerr:
+            warnings.append("流程术语词典读取失败（跳过流程术语检测）：%s" % tgerr)
+        else:
+            t_auth, t_aliases = parse_glossary(tgtext, "术语")
+            for name in t_auth:
+                if name not in authoritative:
+                    authoritative.append(name)
+            for a in t_aliases:
+                if a not in aliases:
+                    aliases.append(a)
+            result["term_glossary"] = TERM_GLOSSARY_REL
+    else:
+        warnings.append("流程术语词典缺失（%s），跳过流程术语检测" % TERM_GLOSSARY_REL)
 
     for rel in BODY_FILES:
         fpath = root / rel
@@ -256,7 +291,7 @@ def main(argv=None):
             errors.append("正文文件读取失败 %s：%s" % (rel, terr))
             continue
         scanned.append(rel)
-        hits.extend(scan_text(rel, text, aliases))
+        hits.extend(scan_text(rel, text, aliases, authoritative))
 
     for h in hits:
         errors.append("正文残留旧名：%s:%d [%s] %s" % (h["file"], h["line"], h["term"], h["context"]))
