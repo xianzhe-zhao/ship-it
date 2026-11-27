@@ -112,8 +112,22 @@ def spec_date(name: str):
         return None
 
 
+def _spec_status(path: Path):
+    """读取 spec front matter 的 status 字段（C8[A4] 用于过滤 paused spec）。"""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    head = text.split("---", 2)
+    front = head[1] if len(head) >= 3 else ""
+    for line in front.splitlines():
+        if line.strip().startswith("status:"):
+            return line.split(":", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
 def active_specs(root: Path):
-    code, out, _err = run_git(root, ["ls-files", "docs/specs/*.md"])
+    code, out, _err = run_git(root, ["ls-files", "ship-it/docs/specs/*.md"])
     if code != 0:
         return []
     result = []
@@ -180,13 +194,16 @@ def check(root: Path, base_override=None, as_json=False):
     code, out, _err = run_git(root, ["diff", "--name-only", base, head])
     if code == 0:
         changed_specs = [item.strip() for item in out.splitlines()
-                         if item.strip().startswith("docs/specs/") and item.strip().endswith(".md")
+                         if (item.strip().startswith("ship-it/docs/specs/") or item.strip().startswith("docs/specs/"))
+                         and item.strip().endswith(".md")
                          and spec_date(item.strip()) is not None
                          and spec_date(item.strip()) >= NEW_RULES_FROM]
     active = sorted(active_specs(root))
     specs = sorted(set(changed_specs) | (set() if changed_specs else set(active[-1:])))
+    # C8[A4]：过滤掉 paused spec（废弃契约流程中旧 spec 置 paused 是合法状态，不应被 spec-first 闸门拦截）
+    specs = [s for s in specs if _spec_status(root / s) not in ("paused",)]
     if not specs:
-        print("PASS: 无新规则 spec，跳过 pre-commit 闸门（staged=%d）" % len(staged))
+        print("PASS: 无新规则 spec（已过滤 paused），跳过 pre-commit 闸门（staged=%d）" % len(staged))
         return 0
 
     failures, outputs = run_check(root, base, head, specs)
