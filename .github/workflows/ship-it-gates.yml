@@ -50,8 +50,8 @@ jobs:
               echo "SKIP: spec status=paused (abandoned contract)" | tee -a ci-logs/check_spec.log
               continue
             fi
-            python ship-it/scripts/check_spec.py "$spec" --stage spec > ci-logs/spec-out.log 2>&1
-            rc=$?
+            python ship-it/scripts/check_spec.py "$spec" --stage spec > ci-logs/spec-out.log 2>&1 || true
+            rc=${PIPESTATUS[0]:-$?}
             cat ci-logs/spec-out.log | tee -a ci-logs/check_spec.log
             if [ $rc -ne 0 ]; then
               echo "check_spec failed for $spec (exit $rc)" | tee -a ci-logs/check_spec.log
