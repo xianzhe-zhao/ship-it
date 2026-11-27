@@ -188,12 +188,15 @@ def check_doc_quality(texts, errors, warnings):
     all_docs.pop("security-kb.md", None)  # 历史安全库用旧角色名
     if ship:
         all_docs["SKILL.md"] = ship
-    for a, b in TERM_PAIRS:
-        files_with_a = [name for name, t in all_docs.items() if a in t]
-        files_with_b = [name for name, t in all_docs.items() if b in t]
-        if files_with_a and files_with_b:
-            errors.append("术语分歧：'%s'（%s）与 '%s'（%s）在不同文件并存，应统一" %
-                          (a, ",".join(files_with_a), b, ",".join(files_with_b)))
+    if getattr(args, 'skip_term_divergence', False):
+        warnings.append("跳过跨文件术语分歧检查（--skip-term-divergence）")
+    else:
+        for a, b in TERM_PAIRS:
+            files_with_a = [name for name, t in all_docs.items() if a in t]
+            files_with_b = [name for name, t in all_docs.items() if b in t]
+            if files_with_a and files_with_b:
+                errors.append("术语分歧：'%s'（%s）与 '%s'（%s）在不同文件并存，应统一" %
+                              (a, ",".join(files_with_a), b, ",".join(files_with_b)))
 
     # 3. 前后矛盾：同一文件内数值/计数前后不一致
     # 检查"X 条 C"/"X 条优化"等计数在不同位置是否一致
@@ -218,6 +221,8 @@ def main(argv=None):
     parser.add_argument("--git-push", help="显式上传 skill 路径；必须在 --root 内（默认全局 skill 为兼容例外）")
     parser.add_argument("--retro", help="复盘文件路径；必须在 --root 内")
     parser.add_argument("--allow-missing-git-push", action="store_true")
+    parser.add_argument("--skip-term-divergence", action="store_true",
+                        help="跳过跨文件术语分歧检查(临时:远程文件版本不一致时用)")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
