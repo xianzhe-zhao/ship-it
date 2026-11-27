@@ -45,8 +45,7 @@ jobs:
           FAILED=0
           for spec in "${CHANGED[@]}"; do
             echo "== $spec (base=$BASE)" | tee -a ci-logs/check_spec.log
-            status=$(python -c "import re,sys; t=open(sys.argv[1],encoding='utf-8',errors='replace').read(); m=re.search(r'^status:\s*[\"']*([^\"'\n]+)',t,re.M); print(m.group(1) if m else '')" "$spec") || true
-            if [ "$status" = "paused" ]; then
+            if grep -q '^status:.*paused' "$spec"; then
               echo "SKIP: spec status=paused (abandoned contract)" | tee -a ci-logs/check_spec.log
               continue
             fi
