@@ -2,6 +2,10 @@
 
 > 本仓库的分发记录。skill 自身的版本变更见 [`ship-it/CHANGELOG.md`](ship-it/CHANGELOG.md)。
 
+## 5.3.0（2026-11-27）
+
+ship-it v5.3.0：测试服务器分支策略（minor）——Step 7 新增"有测试服务器先提 PR 到 test、测试通过再进 main"，Step 2 查 runbook 判定；含 PR #17 的 7 处测试套件修复。详见 [`ship-it/CHANGELOG.md`](ship-it/CHANGELOG.md)。
+
 ## 5.2.1（2026-11-26）
 
 ship-it v5.2.1：可靠性修复（patch，8 条），针对 v5.2.0 开发过程的 13 个出错点与 4 个结构性缺陷——spec 目录统一、版本号单一事实源、spec_flow 一条命令、local_check 复刻 CI、文档质量盲区、已验收条款解冻重跑、分轮澄清可查、出错点沉淀记忆。详见 [`ship-it/CHANGELOG.md`](ship-it/CHANGELOG.md)。
@@ -14,6 +18,7 @@ ship-it v5.2.0：开发流程增强，17 条优化（5 轨道/性能工程师/�
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v5.3.0 | 2026-11-27 | 测试服务器分支策略（minor）：Step 7 有测试服务器先 PR 到 test 再进 main（Step 2 查 runbook 判定）+ project-adaptation 检查项；含 PR #17 测试套件 7 处修复（路径/版本/返回码/编码/转义/残留）。spec：ship-it/docs/specs/2026-11-27-test-server-branch-strategy.md。minor。 |
 | v5.2.1 | 2026-11-26 | 可靠性修复（patch，8 条）：spec 目录统一 ship-it/docs/specs/、版本号单一事实源（动态读 SKILL.md）、spec_flow sign/accept/reconcile、local_check 复刻 CI、文档质量盲区（DUP 短文本+流程术语）、已验收条款解冻重跑、分轮澄清可查、出错点沉淀记忆。spec：ship-it/docs/specs/2026-11-26-v5.2.1-reliability-fixes.md。patch。 |
 | v5.2.0 | 2026-11-26 | 开发流程增强（minor，17 条优化）：5 变更轨道/性能工程师/咨询顾问模式/事前拦截/criterion amendments/三分流/leaf-guard/文档质量检查/C8 机器闸门/条款-实现一致性。spec：docs/specs/2026-11-25-v5.2.0-tracks-roles-degradation.md。minor。 |
 | v5.1.0 | 2026-11-24 | 自身一致性修复（minor）：修 v5.0.0 遗留 4 个真错误（版本号正文矛盾/文件地图漏列/正文未引用新产物/check_text 版本标识矛盾）；修 check_docs.py 默认选 spec bug（硬编码旧 spec → 选文件名版本号最高）。spec：docs/specs/2026-11-24-v5.1.0-skill-self-consistency.md。minor。 |

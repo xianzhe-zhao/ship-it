@@ -1,5 +1,9 @@
 # Changelog — ship-it
 
+## 5.3.0（2026-11-27）
+
+**测试服务器分支策略（minor，含测试套件修复）**：C1 SKILL.md Step 7 新增「测试服务器分支策略」——有测试服务器（Step 2 查 runbook 判定：test/staging 分支、服务器地址、部署脚本）时先提 PR 到 `test`，测试通过后再提 PR 到 `main`，无则直接进 `main`；C2 Step 2 方案自审新增第 7 项与 `project-adaptation.md` 检查清单同步；C3/C4 方案分析与可视化修复报告产出物入契约。同步修复 PR #17 的 7 处测试不同步（路径对齐 `ship-it/docs/specs/`、版本动态读、run_suite FAIL 优先于 SKIP、local_check 编码兜底、check_docs raw docstring、测试残留清理）；check_text SKILL 行数上限 350→360。spec：`ship-it/docs/specs/2026-11-27-test-server-branch-strategy.md`。minor。
+
 ## 5.2.1（2026-11-26）
 
 **可靠性修复（patch，8 条）**：针对 v5.2.0 的 13 出错点与 4 结构性缺陷。C1 spec 目录统一 `ship-it/docs/specs/`（迁 13 旧 spec+前缀对齐+ALLOW 双保留）；C2 EXPECTED_VERSION 动态读 SKILL.md（读不到 exit 1）；C3 `spec_flow.py` sign/accept/reconcile（自校验+回滚）；C4 `local_check.py` 1:1 复刻 CI 四步；C5 文档盲区（DUP 核心对阈值 15+`term-glossary.md`）；C6 已验收条款被改强制解冻重跑（WARNING→ERROR）🔒；C7 分轮追问+先查验塑形可查；C8 出错点沉淀记忆。spec：`ship-it/docs/specs/2026-11-26-v5.2.1-reliability-fixes.md`。patch。
