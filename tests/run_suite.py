@@ -247,9 +247,11 @@ def main(argv=None) -> int:
         print("tests=%d failures=%d errors=%d skipped=%d budget=%s" % (
             report["tests_run"], report["failures"], report["errors"],
             report["skipped"], "PASS" if not report["over_budget"] else "OVER"))
-    if report["skipped"]:
+    if report["failures"] > 0 or report["errors"] > 0:
+        return 1
+    if report["skipped"] > 0:
         return 2
-    return 0 if report["ok"] else 1
+    return 0
 
 
 if __name__ == "__main__":

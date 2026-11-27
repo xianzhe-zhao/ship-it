@@ -62,7 +62,7 @@ def changed_specs(root, base):
 
 def run_step(name, cmd, root):
     """跑一步，返回 (exit_code, stdout+stderr)。"""
-    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", cwd=str(root))
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(root))
     output = proc.stdout + proc.stderr
     return proc.returncode, output
 

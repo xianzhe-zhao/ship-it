@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """A19 行为测试：验收勾选采用代码层归一化，不改变 sign_hash。
 
-契约：docs/specs/2026-11-19-contract-gates-and-concision.md（spec_revision 4）。
+契约：ship-it/docs/specs/2026-11-19-contract-gates-and-concision.md（spec_revision 4）。
 规则：sign_hash 只覆盖 §§1–8；`- [ ] A<n>` 与 `- [x] A<n>` 归一化后 hash 相同；
       填 A/acceptance 后 `--stage accept` PASS；§§1–8 改一行 FAIL。
 """

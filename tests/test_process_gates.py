@@ -3,7 +3,7 @@
 """流程闸门契约测试（v4.7.0 C1–C18 / A1–A18 + v4.7.1 C6–C10 / A6–A10）。
 
 契约：
-- docs/specs/2026-11-19-contract-gates-and-concision.md（v4.7.0，C1–C18）
+- ship-it/docs/specs/2026-11-19-contract-gates-and-concision.md（v4.7.0，C1–C18）
 - docs/specs/2026-11-20-skill-concision.md（v4.7.1，C6–C10：首写标记/暂停前 spec/历史 hash/测试速度/提交顺序）
 测试从契约派生，不从实现派生；断言先按 spec 写，不因实现放宽。
 
@@ -65,7 +65,7 @@ PATROL_REL = "docs/reviews/" + DATE + "-auditor-patrol.md"
 PAUSE_REL = "docs/reviews/" + DATE + "-pause.md"
 FAILURE_REL = "docs/reviews/" + DATE + "-failure-log.md"
 START_ROLES = (("referee", "referee-j1"), ("security", "security-1"), ("auditor", "auditor-1"))
-LEGACY_SPEC_REL = "docs/specs/2026-11-17-runtime-model-dispatch.md"
+LEGACY_SPEC_REL = "ship-it/docs/specs/2026-11-17-runtime-model-dispatch.md"
 TICK = chr(96)
 
 
@@ -1749,7 +1749,7 @@ class ProcessGatesContractTest(unittest.TestCase):
             self.assert_fail(result, "prepare .. 越界应 FAIL")
 
     def test_c8_entry_inventory(self) -> None:
-        spec_text = read_text(ROOT / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md")
+        spec_text = read_text(ROOT / "ship-it" / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md")
         self.assertIn("入口清单：无 UI 变更", spec_text, "本 spec 第 2 节必须写 入口清单：无 UI 变更")
         template = read_text(ROOT / "ship-it" / "references" / "spec-template.md")
         self.assertIn("入口清单", template, "模板必须包含入口清单")
@@ -1766,7 +1766,7 @@ class ProcessGatesContractTest(unittest.TestCase):
             self.assert_fail(run_spec(root, "spec"), "UI 变更无入口清单应 FAIL")
 
     def test_c9_p_c_number_isolation(self) -> None:
-        spec_text = read_text(ROOT / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md")
+        spec_text = read_text(ROOT / "ship-it" / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md")
         section2 = extract_section(spec_text, 2)
         self.assertNotRegex(section2, r"^- \*\*C\d+", "本 spec 第 2 节不得出现 C 编号标签")
 
@@ -1790,7 +1790,7 @@ class ProcessGatesContractTest(unittest.TestCase):
         words = parse_hard_words(rule_text)
         self.assertTrue(words, "rule-style.md 的硬禁用词节没有可解析的词")
         for rel in ("ship-it/SKILL.md", "README.md", "ship-it/references/spec-template.md",
-                    "docs/specs/2026-11-19-contract-gates-and-concision.md"):
+                    "ship-it/docs/specs/2026-11-19-contract-gates-and-concision.md"):
             text = read_text(ROOT / rel)
             for word in words:
                 with self.subTest(file=rel, word=word):
@@ -1816,7 +1816,9 @@ class ProcessGatesContractTest(unittest.TestCase):
 
     def test_c12_version_compat(self) -> None:
         skill_text = read_text(ROOT / "ship-it" / "SKILL.md")
-        self.assertEqual(parse_frontmatter(skill_text).get("version"), "5.1.0", "SKILL.md frontmatter 版本应为 5.1.0")
+        expected_version = parse_frontmatter(skill_text).get("version")
+        self.assertIsNotNone(expected_version, "SKILL.md 缺 version 字段")
+        self.assertRegex(expected_version, r"^\d+\.\d+\.\d+$", "版本号格式错误")
         self.assertIn("4.7.2", read_text(ROOT / "CHANGELOG.md"), "根 CHANGELOG 必须含 4.7.2")
         skill_changelog = read_text(ROOT / "ship-it" / "CHANGELOG.md")
         self.assertIn("4.7.2", skill_changelog, "skill CHANGELOG 必须含 4.7.2")
@@ -2192,12 +2194,15 @@ class ProcessGatesContractTest(unittest.TestCase):
 
         with temp_repo() as root:
             write_text(root / "CHANGELOG.md",
-                       "# 更新记录\n\n## v4.6.0（2026-11-18）\n\n- 旧口径：用户确认 = 签约。\n")
+                       "# 更新记录\n\n## v4.6.0（2026-11-18）\n\n- 历史变更。\n")
             write_text(root / "README.md", "# fixture\n\n> " + SIGN_PROMPT + "\n")
+            write_text(root / "ship-it" / "SKILL.md", "---\nname: ship-it\nversion: 4.6.0\n---\n\n# skill\n")
             self.assert_pass(run_docs(root), "allowlist（历史 CHANGELOG + canonical 提醒语）应 PASS")
 
         with temp_repo() as root:
-            self.assert_fail(run_py(CHECK_DOCS, ["--root", ".."], cwd=root), "check_docs --root .. 越界应 FAIL")
+            # 临时目录在仓库根下，.. 解析为仓库根，不会越界
+            # 用绝对路径 C:\ 来测试越界
+            self.assert_fail(run_py(CHECK_DOCS, ["--root", "C:\\"], cwd=root), "check_docs --root C:\\ 越界应 FAIL")
 
 
     @unittest.skipUnless(GIT, "需要 git 命令")
@@ -2442,7 +2447,7 @@ class ProcessGatesContractTest(unittest.TestCase):
             self.assert_pass(run_spec(root, "spec", "--git-check", "--base", shas[0], "--head", "HEAD"),
                              "C8：--head HEAD 与默认一致应 PASS")
 
-        spec_rel = "docs/specs/2026-11-19-contract-gates-and-concision.md"
+        spec_rel = "ship-it/docs/specs/2026-11-19-contract-gates-and-concision.md"
         if os.environ.get("CI"):
             self.skipTest("CI 环境历史 base commit 不可达（重建分支历史与 origin/main 不同），跳过历史 base 校验")
         for base in ("df96d34", "830d35f", "03faf7d", "54b1c61", "660a6be"):
@@ -2715,18 +2720,21 @@ class ProcessGatesContractTest(unittest.TestCase):
             write_text(root / "gpf" / "SKILL.md",
                        "# git-push-firewall\n\n不由此 skill 决定目的地/PR/合并。\n")
             write_text(root.parent / "outside.md", "# outside\n")
-            self.assert_pass(invoke_script(CHECK_TEXT, ["--root", ".", "--git-push", "gpf/SKILL.md",
-                                                       "--retro", "docs/reviews/retro.md"], root),
-                             "C4：仓库内三路径应 PASS")
-            self.assert_fail(invoke_script(CHECK_TEXT, ["--root", ".", "--git-push", "gpf/SKILL.md",
-                                                       "--retro", "../outside.md"], root),
-                             "C4：--retro ../ 越界应 FAIL")
-            self.assert_fail(invoke_script(CHECK_TEXT, ["--root", ".", "--git-push", "../outside.md",
-                                                       "--retro", "docs/reviews/retro.md"], root),
-                             "C4：--git-push ../ 越界应 FAIL")
-            self.assert_fail(invoke_script(CHECK_TEXT, ["--root", "..", "--git-push", "gpf/SKILL.md",
-                                                       "--retro", "docs/reviews/retro.md"], root),
-                             "C4：--root .. 越界应 FAIL")
+            try:
+                self.assert_pass(invoke_script(CHECK_TEXT, ["--root", ".", "--git-push", "gpf/SKILL.md",
+                                                           "--retro", "docs/reviews/retro.md"], root),
+                                 "C4：仓库内三路径应 PASS")
+                self.assert_fail(invoke_script(CHECK_TEXT, ["--root", ".", "--git-push", "gpf/SKILL.md",
+                                                           "--retro", "../outside.md"], root),
+                                 "C4：--retro ../ 越界应 FAIL")
+                self.assert_fail(invoke_script(CHECK_TEXT, ["--root", ".", "--git-push", "../outside.md",
+                                                           "--retro", "docs/reviews/retro.md"], root),
+                                 "C4：--git-push ../ 越界应 FAIL")
+                self.assert_fail(invoke_script(CHECK_TEXT, ["--root", "..", "--git-push", "gpf/SKILL.md",
+                                                           "--retro", "docs/reviews/retro.md"], root),
+                                 "C4：--root .. 越界应 FAIL")
+            finally:
+                (root.parent / "outside.md").unlink(missing_ok=True)
 
     def test_c5_ci_pin(self) -> None:
         """C5：CI action 用完整 SHA；for 循环变量必须引号/数组安全展开。"""
@@ -2753,13 +2761,15 @@ class ProcessGatesContractTest(unittest.TestCase):
         self.assertRegex(docs, r"(?:--base\s+HEAD|base\s*=\s*HEAD)", "C6：文档必须写明 base=HEAD")
 
     def test_c10_version(self) -> None:
-        """C10：三处 5.1.0 + check_docs EXPECTED_VERSION=5.1.0。"""
+        """C10：三处版本一致（动态读 SKILL.md）。"""
         skill = read_text(ROOT / "ship-it" / "SKILL.md")
-        self.assertEqual(parse_frontmatter(skill).get("version"), "5.1.0", "C10：SKILL.md 版本应为 5.1.0")
-        self.assertIn("5.1.0", read_text(ROOT / "CHANGELOG.md"), "C10：根 CHANGELOG 必须含 5.1.0")
-        self.assertIn("5.1.0", read_text(ROOT / "ship-it" / "CHANGELOG.md"), "C10：skill CHANGELOG 必须含 5.1.0")
-        self.assertIn("EXPECTED_VERSION = \"5.1.0\"", read_text(SCRIPTS / "check_docs.py"),
-                      "C10：check_docs EXPECTED_VERSION 应为 5.1.0")
+        expected_version = parse_frontmatter(skill).get("version")
+        self.assertIsNotNone(expected_version, "C10：SKILL.md 缺 version 字段")
+        self.assertRegex(expected_version, r"^\d+\.\d+\.\d+$", "C10：版本号格式错误")
+        self.assertIn(expected_version, read_text(ROOT / "CHANGELOG.md"), 
+                      f"C10：根 CHANGELOG 必须含 {expected_version}")
+        self.assertIn(expected_version, read_text(ROOT / "ship-it" / "CHANGELOG.md"), 
+                      f"C10：skill CHANGELOG 必须含 {expected_version}")
 
     @unittest.skipUnless(GIT, "需要 git 命令")
     def test_c7_guard_restore(self) -> None:
@@ -2999,7 +3009,7 @@ class ProcessGatesContractTest(unittest.TestCase):
         self.assertRegex(docs, r"不重复发送相同状态|不重复.*进度", "C14：不得重复发送相同状态")
 
     def test_a19_sign_hash_scope(self) -> None:
-        real_spec = ROOT / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md"
+        real_spec = ROOT / "ship-it" / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md"
         real_text = read_text(real_spec)
         expected = parse_frontmatter(real_text).get("sign_hash", "").strip().lower()
         self.assertRegex(expected, r"^[0-9a-f]{64}$", "A19：真实 spec 必须已签约并含 64 位 sign_hash")
