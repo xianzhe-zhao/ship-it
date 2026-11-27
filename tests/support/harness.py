@@ -153,7 +153,7 @@ def _cached_run_git(original):
         if (len(arguments) == 2 and arguments[0] == "show"
                 and ":" in str(arguments[1])):
             commit, path = str(arguments[1]).split(":", 1)
-            if path.startswith("docs/specs/"):
+            if path.startswith("ship-it/docs/specs/"):
                 blobs = _spec_blob_map(root, head, path)
                 if commit in blobs:
                     return 0, blobs[commit], ""
