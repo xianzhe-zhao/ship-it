@@ -165,9 +165,10 @@ class ReviewerJudgeContractTest(unittest.TestCase):
     # C12/A12：v4.7.0 三处版本同步（4.6.0 → 4.7.0）
     def test_c11_version_and_sync(self) -> None:
         meta = frontmatter(self.skill)
-        self.assertEqual(meta.get("version"), "5.2.1")
+        expected = meta.get("version")
+        self.assertRegex(expected or "", r"^\d+\.\d+\.\d+$", "SKILL.md version 缺失或格式错误")
         for rel in ("CHANGELOG.md", "ship-it/CHANGELOG.md"):
-            self.assertIn("5.2.1", read(rel))
+            self.assertIn(expected, read(rel))
         for kw in ("代码安全员", "监察员（异常与偷懒审查）", "裁判员"):
             self.assertIn(kw, self.readme)
         self.assertIn("监督规则源", self.runbook)

@@ -63,7 +63,7 @@ class C2ExpectedVersionDynamic(unittest.TestCase):
         import re
         m = re.search(r"^version:\s*(\d+\.\d+\.\d+)\s*$", skill, re.M)
         self.assertIsNotNone(m, "C2：SKILL.md frontmatter 应有合法 version")
-        self.assertEqual(m.group(1), "5.2.1", "C2：SKILL.md version 应为 5.2.1")
+        # 版本号本身不硬编码（动态读，升级不需改测试）；三处一致性由 CHANGELOG 测试覆盖
 
     def test_c2_check_docs_dynamic_read_logic(self):
         """check_docs.py 有动态读 EXPECTED_VERSION 的逻辑（main 里覆盖模块级默认值）。"""

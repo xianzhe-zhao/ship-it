@@ -1,7 +1,7 @@
 ---
 name: ship-it
 description: "代码变更→测试→发布（契约模式），9 步不跳步：澄清→spec 签约→编码→测试→核销→验收→PR→发布→清理。用户提出需要修改代码并最终交付/发布的需求时启用。签约/验收分别只认只含“签约”“验收”两个字的用户消息；核销与全文一致性由机器校验。团队模式含代码安全员/监察员/裁判员。触发词：改代码、修 bug、加功能、重构、需求评审、安全审查、漏洞、写个 spec、契约、验收标准、写测试、回归测试、E2E、视觉自测、准备 PR、版本号、发布、上线、deploy、release。"
-version: 5.2.1
+version: 5.3.0
 ---
 
 # ship-it（开发发布工作流 · 契约模式）
@@ -262,7 +262,7 @@ version: 5.2.1
 
 ## Step 7：版本号 + PR
 
-先找项目版本来源：`package.json` / `pyproject.toml` / `VERSION` / `CHANGELOG.md` 顶部 / git tag。有则按 SemVer 递增，无则从 `1.0.0` 起。在项目里明确唯一来源，别让两处版本号打架。本 skill 自身三处一致：`ship-it/SKILL.md` frontmatter、`ship-it/CHANGELOG.md`、根 `CHANGELOG.md`（当前 v5.2.1）。
+先找项目版本来源：`package.json` / `pyproject.toml` / `VERSION` / `CHANGELOG.md` 顶部 / git tag。有则按 SemVer 递增，无则从 `1.0.0` 起。在项目里明确唯一来源，别让两处版本号打架。本 skill 自身三处一致：`ship-it/SKILL.md` frontmatter、`ship-it/CHANGELOG.md`、根 `CHANGELOG.md`（当前 v5.3.0）。
 
 提交：`git checkout main && git pull` → `git checkout -b feature/<简短描述>` → `git add -A` → `git commit -m "<type>(<scope>): <摘要> [v<版本号>]"` → `git push origin <branch>` → `gh pr create --base main --head <branch>`。
 
@@ -300,7 +300,7 @@ PR 说明四块缺一不可：①版本号 + 变更摘要；②spec 契约（文
 | 新功能 | minor | `1.4.3` → `1.5.0` |
 | 破坏性更新 | major | `1.5.0` → `2.0.0` |
 
-破坏性变更必须在变更摘要里显式标注 ⚠️。本 skill 版本三处一致（当前 v5.2.1），改一处必须同步另两处。
+破坏性变更必须在变更摘要里显式标注 ⚠️。本 skill 版本三处一致（当前 v5.3.0），改一处必须同步另两处。
 
 ## 关键原则
 1. 不跳步：Step 6 用户验收不能省——自动化通过 ≠ 用户验收通过。2. 每步汇报：做了什么 / 结果 / 下一步。3. 遇阻即停：任何一步失败停下修或等指示，不带病推进。4. spec-first：需求变更先改 spec，再派生代码与测试。5. 默认复用：A/B 优先，选 C 新建必须写成本对比。6. 自测两层性：逻辑正确（条款核销）+ 路径真实（鼠标操作 + 坐标断言）；只过第一层就交付 = 返工。7. 垃圾文件零容忍。8. 凭据纪律。9. 测试只读、只打测试环境。10. 禁止自证：agent 不可自判合规，关键节点（mini-spec 资格 / 纯文档免流程资格 / 核销 ✅ / 能力声明）必须机器可查或用户确认；执行者 ≠ 裁定者 🔒。11. 监督分离：监察员是主脑唯一汇总接口；测试员只做验收测试；代码安全员代码审查+安全检查；裁判员只审契约（不审代码/不测试）；三者只读、只报告，裁判员 PASS 不替代用户验收与机器校验；主脑不得代写审查记录、不得直接给子代理发结束令 🔒。
