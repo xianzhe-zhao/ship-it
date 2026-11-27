@@ -160,17 +160,31 @@ def check_doc_quality(texts, errors, warnings):
             ref_texts[md.name] = read_text(md)
     ship = texts.get("ship-it/SKILL.md", "")
 
-    # 术语对：(应统一的用词A, 应统一的用词B)——同一概念不应两种写法并存于不同文件
-    TERM_PAIRS = [
-        ("五选一", "五轨道"),       # 变更轨道数量
-        ("五条轨道", "五轨道"),
-        # "咨询顾问模式" vs "咨询顾问" 非真分歧（子串），不检查
-        ("代码审查员", "代码安全员"),  # 角色名（应以代码安全员为准）
-        ("审查员", "监察员"),        # 角色名（应以监察员为准）
-        ("需求澄清员", "需求分析师"),  # 角色名（应以需求分析师为准）
-    ]
+    # C5[B3]：术语对从 term-glossary.md 词典读（消除第二份硬编码源）
+    # term-glossary.md 表格格式：| 术语 | 别名（顿号分隔） | 定义 |
+    # 解析出 (别名, 权威术语) 对——同一概念不应两种写法并存于不同文件
+    TERM_PAIRS = []
+    glossary_path = refs_dir / "term-glossary.md"
+    if glossary_path.is_file():
+        glossary_text = read_text(glossary_path)
+        in_table = False
+        for line in glossary_text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("| 术语") and "别名" in stripped:
+                in_table = True
+                continue
+            if in_table and stripped.startswith("|") and not stripped.startswith("|---"):
+                cells = [c.strip() for c in stripped.strip("|").split("|")]
+                if len(cells) >= 2 and cells[0] and cells[1]:
+                    canonical = cells[0]
+                    aliases = [a.strip() for a in cells[1].split("、") if a.strip()]
+                    for alias in aliases:
+                        TERM_PAIRS.append((alias, canonical))
+            elif in_table and not stripped.startswith("|"):
+                in_table = False
     all_docs = dict(ref_texts)
     all_docs.pop("role-glossary.md", None)
+    all_docs.pop("term-glossary.md", None)  # C5：流程术语词典，别名是设计，不判分歧
     all_docs.pop("security-kb.md", None)  # 历史安全库用旧角色名
     if ship:
         all_docs["SKILL.md"] = ship
