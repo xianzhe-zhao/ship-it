@@ -37,6 +37,9 @@ jobs:
         run: |
           mkdir -p ci-logs
           BASE="${{ steps.base.outputs.sha }}"
+          echo "DEBUG: python=$(which python) version=$(python --version 2>&1)"
+          echo "DEBUG: ls ship-it/scripts/check_spec.py=$(ls -la ship-it/scripts/check_spec.py 2>&1)"
+          echo "DEBUG: ls ship-it/scripts/spec_hash.py=$(ls -la ship-it/scripts/spec_hash.py 2>&1)"
           mapfile -t CHANGED < <(git diff --name-only "$BASE"...HEAD -- 'ship-it/docs/specs/*.md' || true)
           if [ "${#CHANGED[@]}" -eq 0 ]; then
             echo "no changed spec; skip check_spec" | tee ci-logs/check_spec.log
@@ -52,6 +55,7 @@ jobs:
             fi
             python ship-it/scripts/check_spec.py "$spec" --stage spec > ci-logs/spec-out.log 2>&1
             rc=$?
+            echo "DEBUG: check_spec exit=$rc, output:" | tee -a ci-logs/check_spec.log
             cat ci-logs/spec-out.log | tee -a ci-logs/check_spec.log
             if [ $rc -ne 0 ]; then
               echo "check_spec failed for $spec (exit $rc)" | tee -a ci-logs/check_spec.log
