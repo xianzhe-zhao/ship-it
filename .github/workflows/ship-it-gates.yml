@@ -38,7 +38,7 @@ jobs:
           set -o pipefail
           mkdir -p ci-logs
           BASE="${{ steps.base.outputs.sha }}"
-          mapfile -t CHANGED < <(git diff --name-only "$BASE"...HEAD -- 'docs/specs/*.md' || true)
+          mapfile -t CHANGED < <(git diff --name-only "$BASE"...HEAD -- 'ship-it/docs/specs/*.md' || true)
           if [ "${#CHANGED[@]}" -eq 0 ]; then
             echo "no changed spec; skip check_spec" | tee ci-logs/check_spec.log
             exit 0
