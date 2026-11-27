@@ -45,7 +45,7 @@ jobs:
           FAILED=0
           for spec in "${CHANGED[@]}"; do
             echo "== $spec (base=$BASE)" | tee -a ci-logs/check_spec.log
-            status=$(grep -m1 '^status:' "$spec" | cut -d: -f2 | tr -d ' "') || true
+            status=$(awk -F': ' '/^status:/{gsub(/["'"'"']/,"",$2);print $2;exit}' "$spec") || true
             if [ "$status" = "paused" ]; then
               echo "SKIP: spec status=paused (abandoned contract)" | tee -a ci-logs/check_spec.log
               continue
