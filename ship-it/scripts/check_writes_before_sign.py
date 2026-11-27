@@ -37,10 +37,11 @@ IMPL_PREFIXES = (
     "scripts/", "tools/",
 )
 # 白名单：这些前缀即使被改也算"文档/流程"，不拦截
+# 注：ship-it/ 不整体白名单（scripts/SKILL.md 等是实现）；只白名单 ship-it/docs/ 下的 spec/reviews
 ALLOW_PREFIXES = (
     "docs/", "docs/specs/", "docs/reviews/",
+    "ship-it/docs/specs/", "ship-it/docs/reviews/",
     ".agents/", ".dsh-project-memory/",
-    "ship-it/",
     "CHANGELOG.md", "README.md", "CLAUDE.md", "AGENTS.md",
 )
 

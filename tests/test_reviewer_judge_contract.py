@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "docs" / "specs" / "2026-11-18-reviewer-judge-roles.md"
+SPEC = ROOT / "ship-it" / "docs" / "specs" / "2026-11-18-reviewer-judge-roles.md"
 
 
 def read(rel: str) -> str:
@@ -165,9 +165,9 @@ class ReviewerJudgeContractTest(unittest.TestCase):
     # C12/A12：v4.7.0 三处版本同步（4.6.0 → 4.7.0）
     def test_c11_version_and_sync(self) -> None:
         meta = frontmatter(self.skill)
-        self.assertEqual(meta.get("version"), "5.1.0")
+        self.assertEqual(meta.get("version"), "5.2.1")
         for rel in ("CHANGELOG.md", "ship-it/CHANGELOG.md"):
-            self.assertIn("5.1.0", read(rel))
+            self.assertIn("5.2.1", read(rel))
         for kw in ("代码安全员", "监察员（异常与偷懒审查）", "裁判员"):
             self.assertIn(kw, self.readme)
         self.assertIn("监督规则源", self.runbook)
@@ -193,7 +193,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
     def test_c13_role_activation_matrix(self) -> None:
         for form in ("0 单干", "1 小改", "2 中改", "3 大改/高风险"):
             self.assertIn(form, self.team)
-        self.assertIn("全部 8 角色", self.team)
+        self.assertIn("全部 9 角色", self.team)
         self.assertIn("代码安全员、监察员、裁判员", self.team)
         self.assertIn("**需求分析师**：按需", self.team)
         self.assertIn("**测试员**：团队模式形态 1–3 必执行", self.team)
@@ -416,7 +416,7 @@ class ReviewerJudgeContractTest(unittest.TestCase):
     def test_core_check_spec_spec_stage(self) -> None:
         result = run_check_spec(SPEC, "spec")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        historical = ROOT / "docs" / "specs" / "2026-11-17-runtime-model-dispatch.md"
+        historical = ROOT / "ship-it" / "docs" / "specs" / "2026-11-17-runtime-model-dispatch.md"
         result2 = run_check_spec(historical, "spec")
         self.assertEqual(result2.returncode, 0, result2.stdout + result2.stderr)
 

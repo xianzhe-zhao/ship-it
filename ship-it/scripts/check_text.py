@@ -140,7 +140,7 @@ def check_contradictions(ship_text: str, errors):
                 errors.append(msg)
 
 
-def check_doc_quality(texts, errors, warnings):
+def check_doc_quality(texts, errors, warnings, skip_term_divergence=False):
     """C15：验收前文档质量检查——废话词/术语统一/跨文件分歧/前后矛盾。"""
     # 1. 废话词（主观形容词无判定方式）
     FLUFF_WORDS = ["更加", "更好地", "完善的", "合理的", "适当", "进一步", "尽可能", "尽量", "原则上", "一般来说", "基本上", "大致", "差不多"]
@@ -160,26 +160,43 @@ def check_doc_quality(texts, errors, warnings):
             ref_texts[md.name] = read_text(md)
     ship = texts.get("ship-it/SKILL.md", "")
 
-    # 术语对：(应统一的用词A, 应统一的用词B)——同一概念不应两种写法并存于不同文件
-    TERM_PAIRS = [
-        ("五选一", "五轨道"),       # 变更轨道数量
-        ("五条轨道", "五轨道"),
-        # "咨询顾问模式" vs "咨询顾问" 非真分歧（子串），不检查
-        ("代码审查员", "代码安全员"),  # 角色名（应以代码安全员为准）
-        ("审查员", "监察员"),        # 角色名（应以监察员为准）
-        ("需求澄清员", "需求分析师"),  # 角色名（应以需求分析师为准）
-    ]
+    # C5[B3]：术语对从 term-glossary.md 词典读（消除第二份硬编码源）
+    # term-glossary.md 表格格式：| 术语 | 别名（顿号分隔） | 定义 |
+    # 解析出 (别名, 权威术语) 对——同一概念不应两种写法并存于不同文件
+    TERM_PAIRS = []
+    glossary_path = refs_dir / "term-glossary.md"
+    if glossary_path.is_file():
+        glossary_text = read_text(glossary_path)
+        in_table = False
+        for line in glossary_text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("| 术语") and "别名" in stripped:
+                in_table = True
+                continue
+            if in_table and stripped.startswith("|") and not stripped.startswith("|---"):
+                cells = [c.strip() for c in stripped.strip("|").split("|")]
+                if len(cells) >= 2 and cells[0] and cells[1]:
+                    canonical = cells[0]
+                    aliases = [a.strip() for a in cells[1].split("、") if a.strip()]
+                    for alias in aliases:
+                        TERM_PAIRS.append((alias, canonical))
+            elif in_table and not stripped.startswith("|"):
+                in_table = False
     all_docs = dict(ref_texts)
     all_docs.pop("role-glossary.md", None)
+    all_docs.pop("term-glossary.md", None)  # C5：流程术语词典，别名是设计，不判分歧
     all_docs.pop("security-kb.md", None)  # 历史安全库用旧角色名
     if ship:
         all_docs["SKILL.md"] = ship
-    for a, b in TERM_PAIRS:
-        files_with_a = [name for name, t in all_docs.items() if a in t]
-        files_with_b = [name for name, t in all_docs.items() if b in t]
-        if files_with_a and files_with_b:
-            errors.append("术语分歧：'%s'（%s）与 '%s'（%s）在不同文件并存，应统一" %
-                          (a, ",".join(files_with_a), b, ",".join(files_with_b)))
+    if skip_term_divergence:
+        warnings.append("跳过跨文件术语分歧检查（--skip-term-divergence）")
+    else:
+        for a, b in TERM_PAIRS:
+            files_with_a = [name for name, t in all_docs.items() if a in t]
+            files_with_b = [name for name, t in all_docs.items() if b in t]
+            if files_with_a and files_with_b:
+                errors.append("术语分歧：'%s'（%s）与 '%s'（%s）在不同文件并存，应统一" %
+                              (a, ",".join(files_with_a), b, ",".join(files_with_b)))
 
     # 3. 前后矛盾：同一文件内数值/计数前后不一致
     # 检查"X 条 C"/"X 条优化"等计数在不同位置是否一致
@@ -204,6 +221,8 @@ def main(argv=None):
     parser.add_argument("--git-push", help="显式上传 skill 路径；必须在 --root 内（默认全局 skill 为兼容例外）")
     parser.add_argument("--retro", help="复盘文件路径；必须在 --root 内")
     parser.add_argument("--allow-missing-git-push", action="store_true")
+    parser.add_argument("--skip-term-divergence", action="store_true",
+                        help="跳过跨文件术语分歧检查(临时:远程文件版本不一致时用)")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -269,7 +288,7 @@ def main(argv=None):
         if phrase in git_text:
             errors.append("git-push-firewall/SKILL.md 含 PR/合并授权语：%s" % phrase)
     check_contradictions(ship_text, errors)
-    check_doc_quality(texts, errors, warnings)
+    check_doc_quality(texts, errors, warnings, skip_term_divergence=args.skip_term_divergence)
 
     result = {"ok": not errors, "errors": errors, "warnings": warnings,
               "files": {str(path): len(text.splitlines()) for path, text in texts.items()},

@@ -33,7 +33,7 @@ from tests.test_process_gates import (
 )
 
 GIT = shutil.which("git")
-REAL_SPEC = ROOT / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md"
+REAL_SPEC = ROOT / "ship-it" / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md"
 ACCEPTANCE_CHECK_RE = re.compile(r"(?m)^(\s*[-*]\s+\[) \)(\s+\*{0,2}A\d+\b)")
 ACCEPTANCE_UNCHECK_RE = re.compile(r"(?m)^(\s*[-*]\s+\[)[xX](\]\s+\*{0,2}A\d+\b)")
 ACCEPTANCE_LINE_RE = ACCEPTANCE_CHECK_RE

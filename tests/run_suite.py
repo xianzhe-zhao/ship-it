@@ -33,6 +33,7 @@ SUITES = [
     "tests.test_reviewer_judge_contract",
     "tests.test_c10_skip",
     "tests.test_a19_accept_hash",
+    "tests.test_v5_2_1_reliability",
 ]
 DEFAULT_MAX_SECONDS = 300
 DEFAULT_OUT = "tmp/test-run.json"
