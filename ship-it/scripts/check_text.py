@@ -140,7 +140,7 @@ def check_contradictions(ship_text: str, errors):
                 errors.append(msg)
 
 
-def check_doc_quality(texts, errors, warnings):
+def check_doc_quality(texts, errors, warnings, skip_term_divergence=False):
     """C15：验收前文档质量检查——废话词/术语统一/跨文件分歧/前后矛盾。"""
     # 1. 废话词（主观形容词无判定方式）
     FLUFF_WORDS = ["更加", "更好地", "完善的", "合理的", "适当", "进一步", "尽可能", "尽量", "原则上", "一般来说", "基本上", "大致", "差不多"]
@@ -188,7 +188,7 @@ def check_doc_quality(texts, errors, warnings):
     all_docs.pop("security-kb.md", None)  # 历史安全库用旧角色名
     if ship:
         all_docs["SKILL.md"] = ship
-    if getattr(args, 'skip_term_divergence', False):
+    if skip_term_divergence:
         warnings.append("跳过跨文件术语分歧检查（--skip-term-divergence）")
     else:
         for a, b in TERM_PAIRS:
@@ -288,7 +288,7 @@ def main(argv=None):
         if phrase in git_text:
             errors.append("git-push-firewall/SKILL.md 含 PR/合并授权语：%s" % phrase)
     check_contradictions(ship_text, errors)
-    check_doc_quality(texts, errors, warnings)
+    check_doc_quality(texts, errors, warnings, skip_term_divergence=args.skip_term_divergence)
 
     result = {"ok": not errors, "errors": errors, "warnings": warnings,
               "files": {str(path): len(text.splitlines()) for path, text in texts.items()},
