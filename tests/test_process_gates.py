@@ -2194,9 +2194,9 @@ class ProcessGatesContractTest(unittest.TestCase):
 
         with temp_repo() as root:
             write_text(root / "CHANGELOG.md",
-                       "# 更新记录\n\n## v4.6.0（2026-11-18）\n\n- 历史变更。\n")
+                       "# 更新记录\n\n## v5.2.1（2026-11-27）\n\n- 当前版本。\n\n## v4.6.0（2026-11-18）\n\n- 旧口径：用户确认 = 签约。\n")
             write_text(root / "README.md", "# fixture\n\n> " + SIGN_PROMPT + "\n")
-            write_text(root / "ship-it" / "SKILL.md", "---\nname: ship-it\nversion: 4.6.0\n---\n\n# skill\n")
+            write_text(root / "ship-it" / "SKILL.md", "---\nname: ship-it\nversion: 5.2.1\n---\n\n# skill\n")
             self.assert_pass(run_docs(root), "allowlist（历史 CHANGELOG + canonical 提醒语）应 PASS")
 
         with temp_repo() as root:
@@ -2450,12 +2450,18 @@ class ProcessGatesContractTest(unittest.TestCase):
         spec_rel = "ship-it/docs/specs/2026-11-19-contract-gates-and-concision.md"
         if os.environ.get("CI"):
             self.skipTest("CI 环境历史 base commit 不可达（重建分支历史与 origin/main 不同），跳过历史 base 校验")
+        # Check if historical commits exist (shallow clone may not have them)
+        for base in ("df96d34", "830d35f", "03faf7d", "54b1c61", "660a6be"):
+            result = subprocess.run(["git", "rev-parse", "--verify", base], 
+                                  cwd=ROOT, capture_output=True, text=True)
+            if result.returncode != 0:
+                self.skipTest(f"历史 base commit {base} 不可达（可能是浅克隆），跳过历史 base 校验")
         for base in ("df96d34", "830d35f", "03faf7d", "54b1c61", "660a6be"):
             with self.subTest(base=base):
                 result = run_py(CHECK_SPEC, [spec_rel, "--stage", "spec", "--git-check", "--base", base], cwd=ROOT)
                 self.assert_pass(result, "C8/A8：历史 base " + base + " 应 PASS")
         legacy = run_py(CHECK_SPEC, [
-            "docs/specs/2026-11-18-process-violation-retrospective-and-gates.md",
+            "ship-it/docs/specs/2026-11-18-process-violation-retrospective-and-gates.md",
             "--stage", "spec", "--git-check", "--base", "d94613d", "--json",
         ], cwd=ROOT)
         legacy_data = json.loads(legacy.stdout)
@@ -3067,6 +3073,39 @@ class ProcessGatesContractTest(unittest.TestCase):
                 "§9 改动不得改变 §§1–8 hash（A19）",
             )
             self.assert_pass(run_spec(root, "spec"), "仅 §9 改动时 sign_hash 仍有效（A19）")
+
+    def test_c1_test_server_branch_strategy(self) -> None:
+        """C1：SKILL.md Step 7 包含"测试服务器分支策略"说明。"""
+        skill = read_text(ROOT / "ship-it" / "SKILL.md")
+        self.assertIn("测试服务器分支策略", skill, "C1：SKILL.md Step 7 必须包含测试服务器分支策略说明")
+        self.assertIn("先提 PR 到 `test`", skill, "C1：必须说明先提 PR 到 test")
+        self.assertIn("再提 PR 到 `main`", skill, "C1：必须说明再提 PR 到 main")
+
+    def test_c2_detection_via_runbook(self) -> None:
+        """C2：Step 2 方案自审查 runbook 判定有没有测试服务器。"""
+        skill = read_text(ROOT / "ship-it" / "SKILL.md")
+        self.assertIn("测试服务器配置（C2）", skill, "C2：Step 2 必须包含测试服务器配置检查项")
+        self.assertIn("docs/deploy-runbook.md", skill, "C2：必须说明查 runbook")
+        adaptation = read_text(ROOT / "ship-it" / "references" / "project-adaptation.md")
+        self.assertIn("测试服务器配置", adaptation, "C2：project-adaptation.md 必须包含测试服务器配置检查项")
+
+    def test_c3_analysis_deliverable(self) -> None:
+        """C3：方案分析产出物存在且包含决策树结构标记。"""
+        analysis_path = ROOT / "docs" / "reviews" / "2026-11-27-test-server-branch-strategy-analysis.html"
+        self.assertTrue(analysis_path.is_file(), "C3：方案分析 HTML 必须存在")
+        content = read_text(analysis_path)
+        markers = ["选项", "推荐", "决策树", "理由"]
+        found = sum(1 for m in markers if m in content)
+        self.assertGreaterEqual(found, 2, "C3：方案分析必须包含至少 2 个决策树结构标记")
+
+    def test_c4_visual_report(self) -> None:
+        """C4：可视化修复报告存在且包含分区清楚的 before/after 对比、逻辑流程图。"""
+        report_path = ROOT / "docs" / "reviews" / "2026-11-27-test-server-branch-strategy-report.html"
+        self.assertTrue(report_path.is_file(), "C4：可视化报告 HTML 必须存在")
+        content = read_text(report_path)
+        self.assertIn("diff-before", content, "C4：必须包含 before/after 对比")
+        self.assertIn("diff-after", content, "C4：必须包含 before/after 对比")
+        self.assertIn("flowchart", content, "C4：必须包含逻辑流程图")
 
 
 if __name__ == "__main__":

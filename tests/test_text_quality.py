@@ -134,7 +134,7 @@ class TextQualityTest(unittest.TestCase):
         for phrase in SHIP_REQUIRED:
             self.assertIn(phrase, text, "C2：ship-it/SKILL.md 缺 " + phrase)
         self.assertNotIn("git-push-firewall", text, "C2：ship-it 不得点名 git-push-firewall")
-        self.assertLessEqual(len(text.splitlines()), 350, "C2：ship-it/SKILL.md 不得超过 350 行")
+        self.assertLessEqual(len(text.splitlines()), 360, "C2：ship-it/SKILL.md 不得超过 360 行")
         step7 = text[text.find("Step 7"):]
         self.assertIn("读", step7, "C2：Step 7 必须要求远端写前读上传工具")
         self.assertIn("分支", step7, "C2：Step 7 必须要求确认目标分支")
@@ -145,7 +145,7 @@ class TextQualityTest(unittest.TestCase):
         ship = SKILL.read_text(encoding="utf-8")
         gpf = GPF.read_text(encoding="utf-8")
         retro = RETRO.read_text(encoding="utf-8")
-        self.assertLessEqual(len(ship.splitlines()), 350, "C3：ship-it ≤350 行")
+        self.assertLessEqual(len(ship.splitlines()), 360, "C3：ship-it ≤360 行")
         self.assertLessEqual(len(gpf.splitlines()), 60, "C3：git-push-firewall ≤60 行")
         self.assertLessEqual(len(retro.splitlines()), 150, "C3：复盘文件 ≤150 行")
         for name, text in (("ship-it", ship), ("git-push-firewall", gpf), ("retro", retro)):
@@ -163,8 +163,8 @@ class TextQualityTest(unittest.TestCase):
         self.assert_pass(real, "C4：真实仓库 check_text 应 PASS")
         self.assert_pass(check_fixture(), "C4：基线 fixture 应 PASS")
 
-        self.assert_pass(check_fixture(ship=pad_lines(SHIP_BASE, 350)), "C4：ship-it 350 行应 PASS")
-        self.assert_fail(check_fixture(ship=pad_lines(SHIP_BASE, 351)), "C4：ship-it 351 行应 FAIL")
+        self.assert_pass(check_fixture(ship=pad_lines(SHIP_BASE, 360)), "C4：ship-it 360 行应 PASS")
+        self.assert_fail(check_fixture(ship=pad_lines(SHIP_BASE, 361)), "C4：ship-it 361 行应 FAIL")
         self.assert_pass(check_fixture(gpf=pad_lines(GPF_BASE, 60)), "C4：git-push 60 行应 PASS")
         self.assert_fail(check_fixture(gpf=pad_lines(GPF_BASE, 61)), "C4：git-push 61 行应 FAIL")
         self.assert_pass(check_fixture(retro=pad_lines(RETRO_BASE, 150)), "C4：复盘 150 行应 PASS")

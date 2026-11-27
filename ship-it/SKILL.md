@@ -109,10 +109,11 @@ version: 5.2.1
 
 1. 现有能力盘点（必须实际查）：逐层查页面/路由、组件、公共逻辑、后端接口、数据表、脚本工具、依赖；目录映射见 `references/project-adaptation.md`。
 2. 三选一决策（必须写理由 + 放弃了什么）：A 复用（现有能力直接满足，只改配置/数据/文案）；B 扩展（现有能力约 80% 满足，加参数/字段/分支且向后兼容）；C 新建（确实没有且复用显著增加复杂度，必须写“复用成本 vs 新建成本”对比）。选 A/B 必须补一句“放弃了什么”——说明未选方案的代价（如选 A 放弃了 B 的扩展余地、选 B 放弃了 C 的彻底解耦）。默认 A/B；选 C 不写对比 = 未通过自审。
-3. 影响面分析：优先用 ast-grep（结构化调用方扫描，排除注释/字符串/定义）或 LSP references（语言服务器引用查找）查调用方/表/配置，写进 spec：受影响页面/路由、接口与调用方、表/字段（含历史数据）、配置/缓存/端口、回归范围；回答是否引入新状态/并发/权限分支、数据模型是否向前兼容、是否改变接口契约。无 ast-grep/LSP 时降级为 `grep`（现有方式），不阻断，但 spec 注明"影响面分析用 grep，精度有限"。
+3. 影响面分析：优先用 ast-grep 或 LSP references 查调用方/表/配置，写进 spec：受影响页面/路由、接口与调用方、表/字段、配置/缓存/端口、回归范围。无 ast-grep/LSP 时降级为 `grep`，spec 注明"影响面分析用 grep，精度有限"。
 4. 入口清单：从实际架构扫描导航/仪表盘/底栏/深链/搜索/快捷入口/API 调用方等入口；每个入口写打开方式与预期。无 UI 变更 → spec §2 写 `入口清单：无 UI 变更`。
 5. 成本预算：涉及 LLM/付费 API 写单次/日上限与限流；不涉及写“无”。
 6. 测试策略：写 3–5 条可验证验收条件（DoD）→ 升格为 C 条款；指明回归范围；新增 E2E 断言/测试数据只允许写测试库。
+7. 测试服务器配置（C2）：查 runbook 里有没有 `test`/`staging` 分支、测试服务器地址、测试环境部署脚本。有则 Step 7 先提 PR 到 test，无则直接提 PR 到 main。
 
 ### 技术蓝图（写进 spec「技术蓝图」节，不涉及的写“无变更”）
 
@@ -264,6 +265,10 @@ version: 5.2.1
 先找项目版本来源：`package.json` / `pyproject.toml` / `VERSION` / `CHANGELOG.md` 顶部 / git tag。有则按 SemVer 递增，无则从 `1.0.0` 起。在项目里明确唯一来源，别让两处版本号打架。本 skill 自身三处一致：`ship-it/SKILL.md` frontmatter、`ship-it/CHANGELOG.md`、根 `CHANGELOG.md`（当前 v5.2.1）。
 
 提交：`git checkout main && git pull` → `git checkout -b feature/<简短描述>` → `git add -A` → `git commit -m "<type>(<scope>): <摘要> [v<版本号>]"` → `git push origin <branch>` → `gh pr create --base main --head <branch>`。
+
+### 测试服务器分支策略
+
+有测试服务器时（Step 2 查 runbook 判定），先提 PR 到 `test`，测试通过后再提 PR 到 `main`。无测试服务器时直接提 PR 到 `main`。
 
 **远端写边界（C2）**：远端写前必须读上传工具的 skill 与脚本实际参数，确认目标分支；PR 仅在验收后创建；合并仅用户。只写通用“上传工具”，不点名其他 skill。`git push` 不可用（公司代理/网络限制）时，改用项目既有的上传工具或可用的上传方式；上传前确认目标分支，不得静默默认 main。
 

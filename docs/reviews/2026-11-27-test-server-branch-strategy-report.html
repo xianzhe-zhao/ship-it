@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>测试服务器分支策略增强 — 可视化报告</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 2em auto; padding: 0 1em; line-height: 1.6; color: #2c3e50; }
+h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 0.3em; }
+h2 { color: #34495e; margin-top: 2em; border-left: 4px solid #3498db; padding-left: 0.5em; }
+h3 { color: #7f8c8d; margin-top: 1.5em; }
+.section { background: #f8f9fa; padding: 1.5em; margin: 1em 0; border-radius: 8px; }
+.problem { background: #ffe6e6; padding: 1em; margin: 1em 0; border-left: 4px solid #e74c3c; border-radius: 4px; }
+.solution { background: #d5f4e6; padding: 1em; margin: 1em 0; border-left: 4px solid #27ae60; border-radius: 4px; }
+.code-block { background: #f4f4f4; padding: 1em; margin: 0.5em 0; border-radius: 4px; overflow-x: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; }
+.diff-before { background: #ffe6e6; border-left: 3px solid #e74c3c; }
+.diff-after { background: #d5f4e6; border-left: 3px solid #27ae60; }
+.diff-line { display: block; padding: 0.2em 0.5em; }
+.diff-remove { background: #ffcccc; color: #c0392b; }
+.diff-add { background: #ccffcc; color: #27ae60; }
+.flowchart { background: white; padding: 1em; margin: 1em 0; border: 1px solid #ddd; border-radius: 4px; }
+.element { background: white; padding: 0.8em; margin: 0.5em 0; border: 1px solid #ddd; border-radius: 4px; }
+.element-title { font-weight: bold; color: #3498db; margin-bottom: 0.3em; }
+.verification { background: #fff3cd; padding: 0.8em; margin: 0.5em 0; border-left: 3px solid #ffc107; border-radius: 4px; }
+.toc { background: #e8f4f8; padding: 1em; margin: 1em 0; border-radius: 4px; }
+.toc ul { list-style: none; padding-left: 0; }
+.toc li { margin: 0.3em 0; }
+.toc a { color: #3498db; text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<h1>测试服务器分支策略增强 — 可视化报告</h1>
+
+<div class="toc">
+<strong>目录</strong>
+<ul>
+<li><a href="#overview">1. 增强概览</a></li>
+<li><a href="#c1">2. C1 SKILL.md Step 7 加测试服务器分支策略</a></li>
+<li><a href="#c2">3. C2 判定方式查 runbook</a></li>
+<li><a href="#summary">4. 增强总结</a></li>
+</ul>
+</div>
+
+<h2 id="overview">1. 增强概览</h2>
+
+<div class="section">
+<div class="element-title">增强目标</div>
+<p>在 SKILL.md Step 7 加"测试服务器分支策略"，支持有测试服务器时先提 PR 到 <code>test</code>，测试通过后再提 PR 到 <code>main</code>。</p>
+
+<div class="element-title">判定方式</div>
+<p>Step 2 方案自审时查 <code>docs/deploy-runbook.md</code> 里有没有测试服务器配置。</p>
+</div>
+
+<h2 id="c1">2. C1 SKILL.md Step 7 加测试服务器分支策略</h2>
+
+<div class="problem">
+<div class="element-title">问题</div>
+<p>SKILL.md Step 7 只写了"创建 PR 到 main"，没有考虑有测试服务器的场景。</p>
+</div>
+
+<div class="solution">
+<div class="element-title">改了什么</div>
+<p>在 Step 7 加一段"测试服务器分支策略"，说明有测试服务器时先提 PR 到 <code>test</code>，测试通过后再提 PR 到 <code>main</code>。</p>
+
+<div class="element-title">为什么改</div>
+<p>很多项目有测试服务器，需要先合并到 test 分支测试通过后再合并到 main。</p>
+
+<div class="element-title">代码对比</div>
+<div class="code-block">
+<span class="diff-line diff-add">+ ### 测试服务器分支策略</span>
+<span class="diff-line diff-add">+ </span>
+<span class="diff-line diff-add">+ 如果项目有测试服务器（查 runbook 判定），先提 PR 到 `test` 分支，测试通过后再提 PR 到 `main`。</span>
+<span class="diff-line diff-add">+ </span>
+<span class="diff-line diff-add">+ 1. 创建 feature 分支（如 `fix/xxx`）</span>
+<span class="diff-line diff-add">+ 2. 提交改动</span>
+<span class="diff-line diff-add">+ 3. 推送到远端</span>
+<span class="diff-line diff-add">+ 4. 创建 PR 到 `test`</span>
+<span class="diff-line diff-add">+ 5. 测试通过后，创建 PR 从 `test` 到 `main`</span>
+<span class="diff-line diff-add">+ 6. PR 创建即停，等用户审核合并</span>
+</div>
+
+<div class="element-title">改动位置</div>
+<ul>
+<li><code>ship-it/SKILL.md</code> Step 7 节</li>
+</ul>
+</div>
+
+<div class="verification">
+<div class="element-title">怎么验证</div>
+<p>检查 SKILL.md Step 7 是否包含"测试服务器分支策略"说明。</p>
+</div>
+
+<h2 id="c2">3. C2 判定方式查 runbook</h2>
+
+<div class="problem">
+<div class="element-title">问题</div>
+<p>怎么判定项目有没有测试服务器？</p>
+</div>
+
+<div class="solution">
+<div class="element-title">改了什么</div>
+<p>Step 2 方案自审时查 <code>docs/deploy-runbook.md</code> 里有没有测试服务器配置。</p>
+
+<div class="element-title">为什么改</div>
+<p>runbook 是项目配置的唯一事实源，查 runbook 最准确。</p>
+
+<div class="element-title">代码对比</div>
+<div class="code-block">
+<span class="diff-line diff-add">+ ### 测试服务器配置（C2）</span>
+<span class="diff-line diff-add">+ </span>
+<span class="diff-line diff-add">+ 查 `docs/deploy-runbook.md` 里有没有测试服务器配置：</span>
+<span class="diff-line diff-add">+ - 有没有 `test` 或 `staging` 分支？</span>
+<span class="diff-line diff-add">+ - 有没有测试服务器地址？</span>
+<span class="diff-line diff-add">+ - 有没有测试环境部署脚本？</span>
+<span class="diff-line diff-add">+ </span>
+<span class="diff-line diff-add">+ 如果有，按"有测试服务器"处理；如果没有，按"没有测试服务器"处理。</span>
+</div>
+
+<div class="element-title">改动位置</div>
+<ul>
+<li><code>ship-it/SKILL.md</code> Step 2 节</li>
+<li><code>ship-it/references/project-adaptation.md</code> 检查清单</li>
+</ul>
+</div>
+
+<div class="verification">
+<div class="element-title">怎么验证</div>
+<p>检查 Step 2 方案自审时是否查 runbook 判定有没有测试服务器。</p>
+</div>
+
+<h2 id="summary">4. 增强总结</h2>
+
+<div class="section">
+<div class="element-title">改动统计</div>
+<table style="width: 100%; border-collapse: collapse;">
+<tr style="background: #ecf0f1;">
+<th style="padding: 0.5em; border: 1px solid #bdc3c7;">文件</th>
+<th style="padding: 0.5em; border: 1px solid #bdc3c7;">改动数</th>
+<th style="padding: 0.5em; border: 1px solid #bdc3c7;">类型</th>
+</tr>
+<tr>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">ship-it/SKILL.md</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">2 处</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">Step 7 加测试服务器分支策略 + Step 2 加判定方式</td>
+</tr>
+<tr>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">ship-it/references/project-adaptation.md</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">1 处</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">检查清单加"测试服务器配置"</td>
+</tr>
+</table>
+
+<div class="element-title">预期结果</div>
+<ul>
+<li>SKILL.md Step 7 包含"测试服务器分支策略"说明</li>
+<li>判定方式查 runbook（<code>docs/deploy-runbook.md</code>）</li>
+<li>有测试服务器时先提 PR 到 <code>test</code>，测试通过后再提 PR 到 <code>main</code></li>
+<li>没有测试服务器时沿用现有流程（直接提 PR 到 <code>main</code>）</li>
+</ul>
+</div>
+
+</body>
+</html>
