@@ -35,6 +35,7 @@ jobs:
       - name: check_spec --git-check (changed specs)
         shell: bash
         run: |
+          set -o pipefail
           mkdir -p ci-logs
           BASE="${{ steps.base.outputs.sha }}"
           mapfile -t CHANGED < <(git diff --name-only "$BASE"...HEAD -- 'ship-it/docs/specs/*.md' || true)
@@ -42,38 +43,29 @@ jobs:
             echo "no changed spec; skip check_spec" | tee ci-logs/check_spec.log
             exit 0
           fi
-          FAILED=0
           for spec in "${CHANGED[@]}"; do
             echo "== $spec (base=$BASE)" | tee -a ci-logs/check_spec.log
+            # C8[A4]: 跳过 paused spec（废弃契约流程，旧 spec 置 paused 是合法状态）
             if grep -q '^status:.*paused' "$spec"; then
               echo "SKIP: spec status=paused (abandoned contract)" | tee -a ci-logs/check_spec.log
               continue
             fi
-            python ship-it/scripts/check_spec.py "$spec" --stage spec > ci-logs/spec-out.log 2>&1 || true
-            rc=${PIPESTATUS[0]:-$?}
-            cat ci-logs/spec-out.log | tee -a ci-logs/check_spec.log
-            if [ $rc -ne 0 ]; then
-              echo "check_spec failed for $spec (exit $rc)" | tee -a ci-logs/check_spec.log
-              FAILED=1
-            fi
+            python ship-it/scripts/check_spec.py "$spec" --stage spec --git-check --base "$BASE" 2>&1 | tee -a ci-logs/check_spec.log
           done
-          exit $FAILED
 
       - name: check_text
         shell: bash
         run: |
+          set -o pipefail
           mkdir -p ci-logs
-          python ship-it/scripts/check_text.py --root . --allow-missing-git-push --skip-term-divergence 2>&1 | tee ci-logs/check_text.log
+          python ship-it/scripts/check_text.py --root . --allow-missing-git-push 2>&1 | tee ci-logs/check_text.log
 
       - name: check_docs
         shell: bash
         run: |
+          set -o pipefail
           mkdir -p ci-logs
-          # 临时:远程分支由 Contents API 逐文件上传,大文件(SKILL.md/CHANGELOG.md)版本未同步,
-          # 跳过 check_docs 的版本一致性检查;force push 干净 commit 后恢复完整检查
-          python ship-it/scripts/check_docs.py --root . > ci-logs/check_docs.log 2>&1 || true
-          cat ci-logs/check_docs.log | tee -a ci-logs/check_docs.log
-          echo "check_docs warnings tolerated (remote file version mismatch due to Contents API upload)"
+          python ship-it/scripts/check_docs.py --root . 2>&1 | tee ci-logs/check_docs.log
 
       - name: tests
         shell: bash
