@@ -105,6 +105,7 @@
 - [ ] 全局 skill 已安装，且是 junction/symlink（改源仓库即时生效）
 - [ ] 项目约定文件里写明"执行 ship-it"，并列出本项目超出通用流程的规则
 - [ ] `docs/deploy-runbook.md` 覆盖：环境值、部署、回退、验证、回滚卡、服务红线、核心功能清单、安全审查周期
+- [ ] 测试服务器配置（C2）：runbook 里写明有没有 `test`/`staging` 分支、测试服务器地址、测试环境部署脚本（有则 Step 7 先提 PR 到 test，无则直接提 PR 到 main）
 - [ ] CI/CD 项目：runbook 记录了部署通道（分支→环境→workflow 映射）与 CI/CD 回滚方式（revert 重部署）
 - [ ] `docs/specs/_TEMPLATE.md` 已复制并标注来源
 - [ ] 步骤编号与 skill 对齐，有意偏离处已显式标注

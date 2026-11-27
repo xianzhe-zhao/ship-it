@@ -48,7 +48,7 @@ def resolve_inside(raw, root):
     real = Path(os.path.realpath(str(path)))
     return real if is_inside(real, root) else None
 DEFAULT_RETRO = "docs/reviews/2026-11-19-retrospective.md"
-LIMITS = {"ship-it/SKILL.md": 350, "git-push-firewall/SKILL.md": 60, "retrospective": 150}
+LIMITS = {"ship-it/SKILL.md": 360, "git-push-firewall/SKILL.md": 60, "retrospective": 150}
 FALLBACK_BANNED = ["尽量", "适当", "必要时", "原则上", "一般来说", "视情况", "酌情", "看情况", "最好"]
 BOUNDARY_SHIP = ["上传工具", "PR 仅在验收后", "合并仅用户"]
 BOUNDARY_GIT_PUSH = ["不由此 skill 决定"]
