@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>v5.2.1 测试修复 — 可视化报告</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 2em auto; padding: 0 1em; line-height: 1.6; color: #2c3e50; }
+h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 0.3em; }
+h2 { color: #34495e; margin-top: 2em; border-left: 4px solid #3498db; padding-left: 0.5em; }
+h3 { color: #7f8c8d; margin-top: 1.5em; }
+.section { background: #f8f9fa; padding: 1.5em; margin: 1em 0; border-radius: 8px; }
+.problem { background: #ffe6e6; padding: 1em; margin: 1em 0; border-left: 4px solid #e74c3c; border-radius: 4px; }
+.solution { background: #d5f4e6; padding: 1em; margin: 1em 0; border-left: 4px solid #27ae60; border-radius: 4px; }
+.code-block { background: #f4f4f4; padding: 1em; margin: 0.5em 0; border-radius: 4px; overflow-x: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; }
+.diff-before { background: #ffe6e6; border-left: 3px solid #e74c3c; }
+.diff-after { background: #d5f4e6; border-left: 3px solid #27ae60; }
+.diff-line { display: block; padding: 0.2em 0.5em; }
+.diff-remove { background: #ffcccc; color: #c0392b; }
+.diff-add { background: #ccffcc; color: #27ae60; }
+.flowchart { background: white; padding: 1em; margin: 1em 0; border: 1px solid #ddd; border-radius: 4px; }
+.element { background: white; padding: 0.8em; margin: 0.5em 0; border: 1px solid #ddd; border-radius: 4px; }
+.element-title { font-weight: bold; color: #3498db; margin-bottom: 0.3em; }
+.verification { background: #fff3cd; padding: 0.8em; margin: 0.5em 0; border-left: 3px solid #ffc107; border-radius: 4px; }
+.toc { background: #e8f4f8; padding: 1em; margin: 1em 0; border-radius: 4px; }
+.toc ul { list-style: none; padding-left: 0; }
+.toc li { margin: 0.3em 0; }
+.toc a { color: #3498db; text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<h1>v5.2.1 测试修复 — 可视化报告</h1>
+
+<div class="toc">
+<strong>目录</strong>
+<ul>
+<li><a href="#overview">1. 修复概览</a></li>
+<li><a href="#c1">2. C1 测试路径对齐</a></li>
+<li><a href="#c2">3. C2 版本动态读取</a></li>
+<li><a href="#c3">4. C3 run_suite 返回码语义</a></li>
+<li><a href="#c4">5. C4 local_check 编码兜底</a></li>
+<li><a href="#c5">6. C5 check_docs 转义告警</a></li>
+<li><a href="#c6">7. C6 测试残留清理</a></li>
+<li><a href="#summary">8. 修复总结</a></li>
+</ul>
+</div>
+
+<h2 id="overview">1. 修复概览</h2>
+
+<div class="section">
+<div class="flowchart">
+<pre class="mermaid">
+graph TD
+    A[v5.2.1 发布] --> B{测试失败?}
+    B -->|7 FAIL + 4 ERROR| C[分析问题根因]
+    C --> D[7 处不同步]
+    D --> E1[路径硬编码]
+    D --> E2[版本硬编码]
+    D --> E3[fixture 不完整]
+    D --> E4[返回码语义错误]
+    D --> E5[编码崩溃]
+    D --> E6[转义告警]
+    D --> E7[测试残留]
+    E1 --> F[修复方案]
+    E2 --> F
+    E3 --> F
+    E4 --> F
+    E5 --> F
+    E6 --> F
+    E7 --> F
+    F --> G[测试通过]
+    G --> H[提 PR]
+</pre>
+</div>
+</div>
+
+<h2 id="c1">2. C1 测试路径对齐</h2>
+
+<div class="problem">
+<div class="element-title">问题</div>
+测试报 <code>FileNotFoundError: docs/specs/2026-11-19-*.md</code>
+</div>
+
+<div class="solution">
+<div class="element-title">改了什么</div>
+<p>把测试里的 <code>docs/specs/</code> 改为 <code>ship-it/docs/specs/</code>（6 处）</p>
+
+<div class="element-title">为什么改</div>
+<p>v5.2.1 把 spec 目录从 <code>docs/specs/</code> 迁到 <code>ship-it/docs/specs/</code>，但测试代码仍读旧路径</p>
+
+<div class="element-title">代码对比</div>
+<div class="code-block">
+<span class="diff-line diff-remove">- spec_text = read_text(ROOT / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md")</span>
+<span class="diff-line diff-add">+ spec_text = read_text(ROOT / "ship-it" / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md")</span>
+</div>
+
+<div class="element-title">改动位置</div>
+<ul>
+<li><code>tests/test_process_gates.py</code> 第 1752 行</li>
+<li><code>tests/test_process_gates.py</code> 第 1769 行</li>
+<li><code>tests/test_process_gates.py</code> 第 1793 行</li>
+<li><code>tests/test_process_gates.py</code> 第 2445 行</li>
+<li><code>tests/test_process_gates.py</code> 第 2453 行</li>
+<li><code>tests/test_process_gates.py</code> 第 3002 行</li>
+</ul>
+</div>
+
+<div class="verification">
+<div class="element-title">怎么验证</div>
+<p>运行 <code>python -m tests.run_suite</code>，无 FileNotFoundError</p>
+</div>
+
+<h2 id="c2">3. C2 版本动态读取</h2>
+
+<div class="problem">
+<div class="element-title">问题</div>
+测试断言 <code>version == "5.1.0"</code>，但 SKILL.md 已是 <code>5.2.1</code>
+</div>
+
+<div class="solution">
+<div class="element-title">改了什么</div>
+<p>测试从 SKILL.md frontmatter 动态读版本，不再硬编码</p>
+
+<div class="element-title">为什么改</div>
+<p>SKILL.md 是唯一事实源，动态读避免下次版本升级再漂移</p>
+
+<div class="element-title">代码对比</div>
+<div class="code-block">
+<span class="diff-line diff-remove">- self.assertEqual(parse_frontmatter(skill).get("version"), "5.1.0", "C10：SKILL.md 版本应为 5.1.0")</span>
+<span class="diff-line diff-add">+ expected_version = parse_frontmatter(skill).get("version")</span>
+<span class="diff-line diff-add">+ self.assertIsNotNone(expected_version, "SKILL.md 缺 version 字段")</span>
+<span class="diff-line diff-add">+ self.assertRegex(expected_version, r"^\d+\.\d+\.\d+$", "版本号格式错误")</span>
+</div>
+
+<div class="element-title">改动位置</div>
+<ul>
+<li><code>tests/test_process_gates.py</code> 第 2758 行</li>
+<li><code>tests/test_process_gates.py</code> 第 1819 行</li>
+</ul>
+</div>
+
+<div class="verification">
+<div class="element-title">怎么验证</div>
+<p>运行 <code>python -m tests.run_suite</code>，版本断言通过</p>
+</div>
+
+<h2 id="c3">4. C3 run_suite 返回码语义</h2>
+
+<div class="problem">
+<div class="element-title">问题</div>
+测试有 7 FAIL + 4 ERROR，但 <code>run_suite.py</code> 返回 2（SKIP），CI 当通过
+</div>
+
+<div class="solution">
+<div class="element-title">改了什么</div>
+<p>有 FAIL/ERROR 就返回 1，只有纯 SKIP（无 FAIL/ERROR）才返回 2</p>
+
+<div class="element-title">为什么改</div>
+<p>FAIL 优先级高于 SKIP，避免 CI 假绿</p>
+
+<div class="element-title">逻辑流程图</div>
+<div class="flowchart">
+<pre class="mermaid">
+graph TD
+    A[测试运行完成] --> B{有 FAIL 或 ERROR?}
+    B -->|是| C[返回 1]
+    B -->|否| D{有 SKIP?}
+    D -->|是| E[返回 2]
+    D -->|否| F[返回 0]
+    C --> G[CI 报错]
+    E --> H[CI 通过但标记 SKIP]
+    F --> I[CI 通过]
+</pre>
+</div>
+
+<div class="element-title">代码对比</div>
+<div class="code-block">
+<span class="diff-line diff-remove">- if report["skipped"]:</span>
+<span class="diff-line diff-remove">-     return 2</span>
+<span class="diff-line diff-remove">- return 0 if report["ok"] else 1</span>
+<span class="diff-line diff-add">+ if report["failures"] > 0 or report["errors"] > 0:</span>
+<span class="diff-line diff-add">+     return 1</span>
+<span class="diff-line diff-add">+ if report["skipped"] > 0:</span>
+<span class="diff-line diff-add">+     return 2</span>
+<span class="diff-line diff-add">+ return 0</span>
+</div>
+
+<div class="element-title">改动位置</div>
+<ul>
+<li><code>tests/run_suite.py</code> 第 250–252 行</li>
+</ul>
+</div>
+
+<div class="verification">
+<div class="element-title">怎么验证</div>
+<p>运行 <code>python -m tests.run_suite</code>，有 FAIL 时返回 1，纯 SKIP 时返回 2</p>
+</div>
+
+<h2 id="c4">5. C4 local_check 编码兜底</h2>
+
+<div class="problem">
+<div class="element-title">问题</div>
+中文 Windows 下 <code>UnicodeDecodeError</code> → <code>TypeError: can only concatenate str (not "NoneType") to str</code>
+</div>
+
+<div class="solution">
+<div class="element-title">改了什么</div>
+<p>加 <code>errors="replace"</code> 参数</p>
+
+<div class="element-title">为什么改</div>
+<p>解码失败时用 <code></code> 替代，不崩溃</p>
+
+<div class="element-title">代码对比</div>
+<div class="code-block">
+<span class="diff-line diff-remove">- proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", cwd=str(root))</span>
+<span class="diff-line diff-add">+ proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(root))</span>
+</div>
+
+<div class="element-title">改动位置</div>
+<ul>
+<li><code>ship-it/scripts/local_check.py</code> 第 65 行</li>
+</ul>
+</div>
+
+<div class="verification">
+<div class="element-title">怎么验证</div>
+<p>在中文 Windows 下运行 <code>python ship-it/scripts/local_check.py</code>，不崩溃</p>
+</div>
+
+<h2 id="c5">6. C5 check_docs 转义告警</h2>
+
+<div class="problem">
+<div class="element-title">问题</div>
+每次运行都报 <code>SyntaxWarning: "\d" is an invalid escape sequence</code>
+</div>
+
+<div class="solution">
+<div class="element-title">改了什么</div>
+<p>docstring 改为 raw string</p>
+
+<div class="element-title">为什么改</div>
+<p>raw string 里 <code>\d</code> 是字面量，不告警</p>
+
+<div class="element-title">代码对比</div>
+<div class="code-block">
+<span class="diff-line diff-remove">- """解析 spec 文件名中的版本号 v\d+.\d+.\d+，返回 (major, minor, patch) 元组；无则返回 None。"""</span>
+<span class="diff-line diff-add">+ r"""解析 spec 文件名中的版本号 v\d+.\d+.\d+，返回 (major, minor, patch) 元组；无则返回 None。"""</span>
+</div>
+
+<div class="element-title">改动位置</div>
+<ul>
+<li><code>ship-it/scripts/check_docs.py</code> 第 242 行</li>
+</ul>
+</div>
+
+<div class="verification">
+<div class="element-title">怎么验证</div>
+<p>运行 <code>python ship-it/scripts/check_docs.py --help</code>，无 SyntaxWarning</p>
+</div>
+
+<h2 id="c6">7. C6 测试残留清理</h2>
+
+<div class="problem">
+<div class="element-title">问题</div>
+测试失败时 <code>git status</code> 出现 <code>?? outside.md</code>
+</div>
+
+<div class="solution">
+<div class="element-title">改了什么</div>
+<p>测试结束后用 try/finally 清理</p>
+
+<div class="element-title">为什么改</div>
+<p>确保测试结束（无论成功失败）都清理</p>
+
+<div class="element-title">代码对比</div>
+<div class="code-block">
+<span class="diff-line">  with temp_repo() as root:</span>
+<span class="diff-line">      write_text(root.parent / "outside.md", "# outside\n")</span>
+<span class="diff-line diff-add">+     try:</span>
+<span class="diff-line">          # ... 测试逻辑 ...</span>
+<span class="diff-line diff-add">+     finally:</span>
+<span class="diff-line diff-add">+         (root.parent / "outside.md").unlink(missing_ok=True)</span>
+</div>
+
+<div class="element-title">改动位置</div>
+<ul>
+<li><code>tests/test_process_gates.py</code> 第 2717 行附近</li>
+</ul>
+</div>
+
+<div class="verification">
+<div class="element-title">怎么验证</div>
+<p>运行测试后检查 <code>git status</code>，无 <code>?? outside.md</code></p>
+</div>
+
+<h2 id="summary">8. 修复总结</h2>
+
+<div class="section">
+<div class="element-title">改动统计</div>
+<table style="width: 100%; border-collapse: collapse;">
+<tr style="background: #ecf0f1;">
+<th style="padding: 0.5em; border: 1px solid #bdc3c7;">文件</th>
+<th style="padding: 0.5em; border: 1px solid #bdc3c7;">改动数</th>
+<th style="padding: 0.5em; border: 1px solid #bdc3c7;">类型</th>
+</tr>
+<tr>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">tests/test_process_gates.py</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">10 处</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">路径 + 版本 + fixture + 清理</td>
+</tr>
+<tr>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">tests/test_v5_1_0_self_consistency.py</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">1 处</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">路径</td>
+</tr>
+<tr>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">tests/run_suite.py</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">1 处</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">返回码语义</td>
+</tr>
+<tr>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">ship-it/scripts/local_check.py</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">1 处</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">编码</td>
+</tr>
+<tr>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">ship-it/scripts/check_docs.py</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">1 处</td>
+<td style="padding: 0.5em; border: 1px solid #bdc3c7;">转义</td>
+</tr>
+</table>
+
+<div class="element-title">预期结果</div>
+<ul>
+<li>本机 <code>python -m tests.run_suite</code> 退出码 0（无 FAIL/ERROR）</li>
+<li>CI 真实绿（有 FAIL 时返回 1，不再假绿）</li>
+<li>中文 Windows 下 <code>local_check.py</code> 不崩溃</li>
+<li><code>check_docs.py</code> 无 SyntaxWarning</li>
+<li>测试后 <code>git status</code> 干净</li>
+</ul>
+</div>
+
+<script>
+mermaid.initialize({ startOnLoad: true, theme: 'default' });
+</script>
+
+</body>
+</html>

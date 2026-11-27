@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>v5.2.1 测试修复 — 方案分析</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2em auto; padding: 0 1em; line-height: 1.6; color: #2c3e50; }
+h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 0.3em; }
+h2 { color: #34495e; margin-top: 2em; border-left: 4px solid #3498db; padding-left: 0.5em; }
+h3 { color: #7f8c8d; margin-top: 1.5em; }
+.problem { background: #ffe6e6; padding: 1em; margin: 1em 0; border-left: 4px solid #e74c3c; }
+.solution { background: #d5f4e6; padding: 1em; margin: 1em 0; border-left: 4px solid #27ae60; }
+.code { background: #f4f4f4; padding: 0.5em; font-family: 'Consolas', monospace; font-size: 0.9em; overflow-x: auto; }
+.impact { background: #fff3cd; padding: 0.5em; margin: 0.5em 0; border-left: 3px solid #ffc107; }
+.decision-tree { background: #e8f4f8; padding: 1em; margin: 1em 0; border: 1px solid #3498db; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th, td { border: 1px solid #bdc3c7; padding: 0.5em; text-align: left; }
+th { background: #ecf0f1; }
+</style>
+</head>
+<body>
+
+<h1>v5.2.1 测试修复 — 方案分析</h1>
+
+<h2>1. 问题背景</h2>
+
+<p>v5.2.1 发布后（commit <code>54e560d</code>），测试与脚本存在 <strong>7 处不同步</strong>，导致：</p>
+<ul>
+<li>本机（Windows 11 + Python 3.14）测试失败：7 FAIL + 4 ERROR</li>
+<li>CI（Ubuntu + Python 3.11）假绿：有 FAIL 但返回 2（SKIP），被当通过</li>
+<li>中文 Windows 下 <code>local_check.py</code> 直接崩溃</li>
+</ul>
+
+<h2>2. 问题清单与根因分析</h2>
+
+<div class="problem">
+<h3>问题 1：测试路径硬编码（4 ERROR + 部分 FAIL）</h3>
+<p><strong>现象</strong>：测试报 <code>FileNotFoundError: docs/specs/2026-11-19-*.md</code></p>
+<p><strong>根因</strong>：v5.2.1 把 spec 目录从 <code>docs/specs/</code> 迁到 <code>ship-it/docs/specs/</code>，但测试代码仍读旧路径</p>
+<p><strong>影响</strong>：4 个测试 ERROR（FileNotFoundError），5 个测试 FAIL（路径相关断言失败）</p>
+<p><strong>位置</strong>：<code>tests/test_process_gates.py</code> 第 1752/1769/1793/2445/2453/3002 行</p>
+</div>
+
+<div class="problem">
+<h3>问题 2：版本硬编码（2 FAIL）</h3>
+<p><strong>现象</strong>：测试断言 <code>version == "5.1.0"</code>，但 SKILL.md 已是 <code>5.2.1</code></p>
+<p><strong>根因</strong>：测试和 <code>check_docs.py</code> 硬编码版本号，没有从 SKILL.md 动态读取</p>
+<p><strong>影响</strong>：每次版本升级都要手动改测试，容易遗漏</p>
+<p><strong>位置</strong>：<code>tests/test_process_gates.py</code> 第 2758/1819 行，<code>ship-it/scripts/check_docs.py</code> 第 2761 行</p>
+</div>
+
+<div class="problem">
+<h3>问题 3：c18 fixture 缺 ship-it/SKILL.md（1 FAIL）</h3>
+<p><strong>现象</strong>：<code>check_docs</code> 报 <code>ship-it/SKILL.md 不存在，EXPECTED_VERSION 无法动态读取</code></p>
+<p><strong>根因</strong>：测试 fixture 只写了根 <code>CHANGELOG.md</code> 和 <code>ship-it/CHANGELOG.md</code>，没写 <code>ship-it/SKILL.md</code>，但 <code>check_docs</code> 改为动态读版本且 fail closed</p>
+<p><strong>影响</strong>：c18 测试 FAIL</p>
+<p><strong>位置</strong>：<code>tests/test_process_gates.py</code> 第 2193–2197 行</p>
+</div>
+
+<div class="problem">
+<h3>问题 4：run_suite 返回码语义错误（CI 假绿）</h3>
+<p><strong>现象</strong>：测试有 7 FAIL + 4 ERROR，但 <code>run_suite.py</code> 返回 2（SKIP），CI 当通过</p>
+<p><strong>根因</strong>：<code>run_suite.py:250-252</code> 逻辑是"有 SKIP 就 return 2"，没考虑同时有 FAIL/ERROR 的情况</p>
+<p><strong>影响</strong>：CI 假绿，掩盖了所有测试失败</p>
+<p><strong>位置</strong>：<code>tests/run_suite.py</code> 第 250–252 行</p>
+</div>
+
+<div class="problem">
+<h3>问题 5：local_check 编码崩溃（中文 Windows）</h3>
+<p><strong>现象</strong>：<code>UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbd</code>，随后 <code>TypeError: can only concatenate str (not "NoneType") to str</code></p>
+<p><strong>根因</strong>：<code>local_check.py:65</code> 用 <code>text=True, encoding="utf-8"</code> 但没加 <code>errors</code> 参数，解码失败时 <code>stdout</code> 为 None</p>
+<p><strong>影响</strong>：中文 Windows 下 <code>local_check.py</code> 直接崩溃</p>
+<p><strong>位置</strong>：<code>ship-it/scripts/local_check.py</code> 第 65 行</p>
+</div>
+
+<div class="problem">
+<h3>问题 6：check_docs 转义告警</h3>
+<p><strong>现象</strong>：每次运行 <code>check_docs.py</code> 都报 <code>SyntaxWarning: "\d" is an invalid escape sequence</code></p>
+<p><strong>根因</strong>：docstring 里 <code>\d</code> 是无效转义，Python 3.12+ 会告警</p>
+<p><strong>影响</strong>：日志污染，未来版本可能报错</p>
+<p><strong>位置</strong>：<code>ship-it/scripts/check_docs.py</code> 第 242 行</p>
+</div>
+
+<div class="problem">
+<h3>问题 7：测试残留 outside.md</h3>
+<p><strong>现象</strong>：测试失败时 <code>git status</code> 出现 <code>?? outside.md</code></p>
+<p><strong>根因</strong>：<code>test_process_gates.py:2717</code> 写 <code>root.parent / "outside.md"</code>（仓库根），测试异常退出时没清理</p>
+<p><strong>影响</strong>：<code>git status</code> 不干净，需要手动删</p>
+<p><strong>位置</strong>：<code>tests/test_process_gates.py</code> 第 2717 行</p>
+</div>
+
+<h2>3. 解决方案</h2>
+
+<div class="solution">
+<h3>方案 1：测试路径对齐</h3>
+<p><strong>修法</strong>：把所有 <code>docs/specs/</code> 改为 <code>ship-it/docs/specs/</code></p>
+<p><strong>具体改动</strong>：</p>
+<div class="code">
+# tests/test_process_gates.py<br>
+# 第 1752 行<br>
+- spec_text = read_text(ROOT / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md")<br>
++ spec_text = read_text(ROOT / "ship-it" / "docs" / "specs" / "2026-11-19-contract-gates-and-concision.md")<br>
+<br>
+# 第 1769/1793/2445/2453/3002 行同理
+</div>
+<p><strong>为什么这么改</strong>：v5.2.1 已把 spec 统一到 <code>ship-it/docs/specs/</code>，测试必须跟随</p>
+<p><strong>影响范围</strong>：6 处路径字符串，不改测试逻辑</p>
+</div>
+
+<div class="solution">
+<h3>方案 2：版本动态读取</h3>
+<p><strong>修法 A（推荐）</strong>：测试和 <code>check_docs</code> 从 SKILL.md frontmatter 动态读版本</p>
+<div class="code">
+# tests/test_process_gates.py<br>
+# 第 2758 行<br>
+- self.assertEqual(parse_frontmatter(skill).get("version"), "5.1.0", ...)<br>
++ expected_version = parse_frontmatter(skill).get("version")<br>
++ self.assertIsNotNone(expected_version, "SKILL.md 缺 version 字段")<br>
++ self.assertRegex(expected_version, r"^\d+\.\d+\.\d+$", "版本号格式错误")<br>
+<br>
+# ship-it/scripts/check_docs.py<br>
+# 第 2761 行<br>
+- self.assertIn("EXPECTED_VERSION = \"5.1.0\"", read_text(SCRIPTS / "check_docs.py"), ...)<br>
++ # 删除这个断言，改为动态读 SKILL.md 版本
+</div>
+<p><strong>为什么这么改</strong>：SKILL.md 是唯一事实源，动态读避免下次版本升级再漂移</p>
+<p><strong>影响范围</strong>：2 处版本断言，改为动态读取</p>
+
+<p><strong>修法 B（备选）</strong>：手动同步到 <code>5.2.1</code></p>
+<div class="code">
+# 把所有 "5.1.0" 改成 "5.2.1"<br>
+# 缺点：下次版本升级又要手动改
+</div>
+<p><strong>为什么不选 B</strong>：治标不治本，下次升级还会漂移</p>
+</div>
+
+<div class="solution">
+<h3>方案 3：c18 fixture 补 ship-it/SKILL.md</h3>
+<p><strong>修法</strong>：测试 fixture 里补写 <code>ship-it/SKILL.md</code></p>
+<div class="code">
+# tests/test_process_gates.py<br>
+# 第 2193–2197 行<br>
+with temp_repo() as root:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;write_text(root / "CHANGELOG.md", ...)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;write_text(root / "README.md", ...)<br>
++&nbsp;&nbsp;&nbsp;write_text(root / "ship-it" / "SKILL.md", "---\nname: ship-it\nversion: 4.6.0\n---\n\n# skill\n")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self.assert_pass(run_docs(root), ...)
+</div>
+<p><strong>为什么这么改</strong>：<code>check_docs</code> 需要读 SKILL.md 的版本，fixture 必须完整</p>
+<p><strong>影响范围</strong>：1 处 fixture 补全</p>
+</div>
+
+<div class="solution">
+<h3>方案 4：run_suite 返回码语义修正</h3>
+<p><strong>修法</strong>：有 FAIL/ERROR 就返回 1，只有纯 SKIP（无 FAIL/ERROR）才返回 2</p>
+<div class="code">
+# tests/run_suite.py<br>
+# 第 250–252 行<br>
+- if report["skipped"]:<br>
+-&nbsp;&nbsp;&nbsp;&nbsp;return 2<br>
+- return 0 if report["ok"] else 1<br>
++ if report["failures"] > 0 or report["errors"] > 0:<br>
++&nbsp;&nbsp;&nbsp;&nbsp;return 1<br>
++ if report["skipped"] > 0:<br>
++&nbsp;&nbsp;&nbsp;&nbsp;return 2<br>
++ return 0
+</div>
+<p><strong>为什么这么改</strong>：FAIL 优先级高于 SKIP，避免 CI 假绿</p>
+<p><strong>影响范围</strong>：返回码语义，不改测试逻辑</p>
+<p><strong>注意</strong>：CI 把 2 当通过，修法后 FAIL 会返回 1，CI 会正确报错</p>
+</div>
+
+<div class="solution">
+<h3>方案 5：local_check 编码兜底</h3>
+<p><strong>修法</strong>：加 <code>errors="replace"</code></p>
+<div class="code">
+# ship-it/scripts/local_check.py<br>
+# 第 65 行<br>
+- proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", cwd=str(root))<br>
++ proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(root))
+</div>
+<p><strong>为什么这么改</strong>：解码失败时用 <code></code> 替代，不崩溃</p>
+<p><strong>影响范围</strong>：1 处参数，不改逻辑</p>
+</div>
+
+<div class="solution">
+<h3>方案 6：check_docs 转义修复</h3>
+<p><strong>修法</strong>：docstring 改为 raw string</p>
+<div class="code">
+# ship-it/scripts/check_docs.py<br>
+# 第 242 行<br>
+- """解析 spec 文件名中的版本号 v\d+.\d+.\d+，返回 (major, minor, patch) 元组；无则返回 None。"""<br>
++ r"""解析 spec 文件名中的版本号 v\d+.\d+.\d+，返回 (major, minor, patch) 元组；无则返回 None。"""
+</div>
+<p><strong>为什么这么改</strong>：raw string 里 <code>\d</code> 是字面量，不告警</p>
+<p><strong>影响范围</strong>：1 处 docstring，不改逻辑</p>
+</div>
+
+<div class="solution">
+<h3>方案 7：测试残留清理</h3>
+<p><strong>修法 A（推荐）</strong>：测试结束后清理</p>
+<div class="code">
+# tests/test_process_gates.py<br>
+# 第 2717 行附近<br>
+with temp_repo() as root:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;write_text(root.parent / "outside.md", "# outside\n")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;try:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# ... 测试逻辑 ...<br>
+&nbsp;&nbsp;&nbsp;&nbsp;finally:<br>
++&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(root.parent / "outside.md").unlink(missing_ok=True)
+</div>
+<p><strong>为什么这么改</strong>：确保测试结束（无论成功失败）都清理</p>
+<p><strong>影响范围</strong>：1 处 try/finally</p>
+
+<p><strong>修法 B（备选）</strong>：改用临时目录</p>
+<div class="code">
+# 用 tempfile.TemporaryDirectory() 代替 root.parent<br>
+# 缺点：改动较大，测试逻辑要调整
+</div>
+<p><strong>为什么不选 B</strong>：改动大，没必要</p>
+</div>
+
+<h2>4. 方案推导过程（需求分析员视角）</h2>
+
+<h3>4.1 需求分析员做了什么</h3>
+
+<p>作为需求分析员，我的工作流程是：</p>
+<ol>
+<li><strong>收集问题</strong>：从测试输出、CI 日志、用户反馈中收集所有已知问题</li>
+<li><strong>分类归因</strong>：把问题按根因分类（路径/版本/语义/编码/转义/残留）</li>
+<li><strong>盘点现有能力</strong>：查代码，看既有测试框架、校验脚本、路径约定、版本来源</li>
+<li><strong>推导方案</strong>：对每个问题，问"怎么修最合理"，给出推荐方案和备选方案</li>
+<li><strong>评估影响</strong>：分析每个方案的影响范围、风险、成本</li>
+<li><strong>做决策</strong>：综合所有方案，给出最终推荐</li>
+</ol>
+
+<h3>4.2 问题分析与方案推导</h3>
+
+<p><strong>问题 1：测试路径硬编码</strong></p>
+<ul>
+<li><strong>分析</strong>：v5.2.1 把 spec 目录从 <code>docs/specs/</code> 迁到 <code>ship-it/docs/specs/</code>，但测试代码仍读旧路径。这是迁移遗漏，不是设计。</li>
+<li><strong>推导</strong>：既然是迁移遗漏，就应该把测试路径也迁过去。改路径字符串是最小改动，不改测试逻辑。</li>
+<li><strong>方案</strong>：把所有 <code>docs/specs/</code> 改为 <code>ship-it/docs/specs/</code>（6 处）</li>
+</ul>
+
+<p><strong>问题 2：版本硬编码</strong></p>
+<ul>
+<li><strong>分析</strong>：测试和 <code>check_docs</code> 硬编码 <code>5.1.0</code>，但 SKILL.md 已是 <code>5.2.1</code>。每次版本升级都要手动改测试，容易遗漏。</li>
+<li><strong>推导</strong>：版本号的唯一事实源是 SKILL.md frontmatter。如果测试动态读 SKILL.md，就不需要手动同步了。这是"单一事实源"原则。</li>
+<li><strong>方案</strong>：测试和 <code>check_docs</code> 从 SKILL.md 动态读版本，不再硬编码</li>
+<li><strong>备选</strong>：手动同步到 <code>5.2.1</code>。为什么不选？治标不治本，下次升级还会漂移。</li>
+</ul>
+
+<p><strong>问题 3：c18 fixture 缺 ship-it/SKILL.md</strong></p>
+<ul>
+<li><strong>分析</strong>：测试 fixture 只写了根 <code>CHANGELOG.md</code> 和 <code>ship-it/CHANGELOG.md</code>，没写 <code>ship-it/SKILL.md</code>。但 <code>check_docs</code> 改为动态读版本且 fail closed，所以 fixture 必须完整。</li>
+<li><strong>推导</strong>：fixture 不完整是测试 bug，补全即可。</li>
+<li><strong>方案</strong>：测试 fixture 里补写 <code>ship-it/SKILL.md</code>（1 行）</li>
+</ul>
+
+<p><strong>问题 4：run_suite 返回码语义错误</strong></p>
+<ul>
+<li><strong>分析</strong>：<code>run_suite.py:250-252</code> 逻辑是"有 SKIP 就 return 2"，没考虑同时有 FAIL/ERROR 的情况。CI 把 2 当通过，所以有 FAIL 但返回 2 时，CI 假绿。</li>
+<li><strong>推导</strong>：返回码语义应该是：0 = 全过，1 = 有失败，2 = 有 SKIP 但无失败。FAIL 优先级高于 SKIP。</li>
+<li><strong>方案</strong>：改为"有 FAIL/ERROR 就返回 1，只有纯 SKIP 才返回 2"</li>
+</ul>
+
+<p><strong>问题 5：local_check 编码崩溃</strong></p>
+<ul>
+<li><strong>分析</strong>：中文 Windows 下 Python 子进程管道输出默认 cp936，<code>local_check.py:65</code> 用 <code>text=True, encoding="utf-8"</code> 但没加 <code>errors</code> 参数，解码失败时 <code>stdout</code> 为 None，拼接时报 <code>TypeError</code>。</li>
+<li><strong>推导</strong>：加 <code>errors="replace"</code>，解码失败时用 `` 替代，不崩溃。这是标准的编码兜底做法。</li>
+<li><strong>方案</strong>：加 <code>errors="replace"</code>（1 处参数）</li>
+</ul>
+
+<p><strong>问题 6：check_docs 转义告警</strong></p>
+<ul>
+<li><strong>分析</strong>：docstring 里 <code>\d</code> 是无效转义，Python 3.12+ 会告警。这是 Python 语法问题。</li>
+<li><strong>推导</strong>：改为 raw string（<code>r"""..."""</code>），<code>\d</code> 就是字面量，不告警。</li>
+<li><strong>方案</strong>：docstring 改为 raw string（1 处）</li>
+</ul>
+
+<p><strong>问题 7：测试残留 outside.md</strong></p>
+<ul>
+<li><strong>分析</strong>：测试写 <code>root.parent / "outside.md"</code>（仓库根），异常退出时没清理。这是测试清理问题。</li>
+<li><strong>推导</strong>：用 try/finally 确保测试结束（无论成功失败）都清理。这是标准的测试清理做法。</li>
+<li><strong>方案</strong>：测试结束后用 try/finally 清理（1 处）</li>
+<li><strong>备选</strong>：改用临时目录。为什么不选？改动大，没必要。</li>
+</ul>
+
+<h3>4.3 方案对比与决策</h3>
+
+<p>综合 7 个问题的方案，做出最终决策：</p>
+
+<table>
+<tr>
+<th>问题</th>
+<th>推荐方案</th>
+<th>备选方案</th>
+<th>为什么不选备选</th>
+</tr>
+<tr>
+<td>1. 路径硬编码</td>
+<td>改路径字符串</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2. 版本硬编码</td>
+<td>动态读 SKILL.md</td>
+<td>手动同步 5.2.1</td>
+<td>治标不治本，下次升级还会漂移</td>
+</tr>
+<tr>
+<td>3. c18 fixture</td>
+<td>补 ship-it/SKILL.md</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4. run_suite 返回码</td>
+<td>FAIL 优先于 SKIP</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5. local_check 编码</td>
+<td>加 errors="replace"</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6. check_docs 转义</td>
+<td>raw string</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>7. 测试残留</td>
+<td>try/finally 清理</td>
+<td>改临时目录</td>
+<td>改动大，没必要</td>
+</tr>
+</table>
+
+<h2>5. 方案总结</h2>
+
+<div class="decision-tree">
+<p><strong>决策树</strong>：从三个选项中选择最终方案。</p>
+
+<p><strong>选项</strong>：</p>
+<ul>
+<li>选项 A：只修本机（.local/ 适配层继续兜底）—— 快但下次 pull 会再漂移</li>
+<li>选项 B：修上游源码（tests/ + scripts/）—— 根治问题，贡献回社区</li>
+<li>选项 C：两者都做（修上游 + 保留 .local/ 兜底）—— 过度，.local/ 在修完后已无必要</li>
+</ul>
+
+<p><strong>推荐</strong>：选项 B（修上游源码）+ 动态读版本 + 提 PR 到 upstream</p>
+
+<p><strong>理由</strong>：</p>
+<ul>
+<li>上游 7 个问题都是代码层面的不同步，不是环境差异</li>
+<li>测试路径硬编码 <code>docs/specs/</code> 但 v5.2.1 已统一到 <code>ship-it/docs/specs/</code>，这是 bug 不是特性</li>
+<li>版本硬编码 <code>5.1.0</code> 但 SKILL.md 已是 <code>5.2.1</code>，这是遗漏不是设计</li>
+<li><code>run_suite.py</code> 返回码语义会掩盖 FAIL，这是 CI 假绿的根因</li>
+<li>提 PR 可以让本地与上游同步，避免下次 pull 冲突</li>
+<li>动态读版本只需改一次，以后自动跟随，不会再次漂移</li>
+</ul>
+
+<p><strong>最终决策</strong>：按推荐方案修复 7 个问题</p>
+<ul>
+<li>测试路径对齐（6 处）</li>
+<li>版本动态读取（2 处）</li>
+<li>c18 fixture 补全（1 处）</li>
+<li>run_suite 返回码语义修正</li>
+<li>local_check 编码兜底</li>
+<li>check_docs 转义修复</li>
+<li>测试残留清理</li>
+</ul>
+<p><strong>改动文件</strong>：8 个（tests/ 5 个 + scripts/ 3 个）</p>
+<p><strong>改动行数</strong>：约 20 行（字符串替换 + 逻辑调整）</p>
+<p><strong>风险</strong>：低（不改契约语义，只修测试与脚本的不同步）</p>
+</div>
+
+</body>
+</html>
