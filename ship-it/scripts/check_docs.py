@@ -239,7 +239,7 @@ def changelog_regions(rel, lines):
 # ---------------------------------------------------------------------------
 
 def parse_spec_version_from_name(name):
-    """解析 spec 文件名中的版本号 v\d+.\d+.\d+，返回 (major, minor, patch) 元组；无则返回 None。"""
+    r"""解析 spec 文件名中的版本号 v\d+.\d+.\d+，返回 (major, minor, patch) 元组；无则返回 None。"""
     m = re.search(r'v(\d+)\.(\d+)\.(\d+)', name)
     if m:
         return (int(m.group(1)), int(m.group(2)), int(m.group(3)))

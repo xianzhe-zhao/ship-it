@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """C10 SKIP 语义行为级测试。
 
-契约：docs/specs/2026-11-19-contract-gates-and-concision.md C10。
+契约：ship-it/docs/specs/2026-11-19-contract-gates-and-concision.md C10。
 规则：测试脚本遇 SKIP 必须退出码 2；退出码 0 + SKIP = 假绿 FAIL。
 
 两种用法：

@@ -3,7 +3,7 @@
 """v4.6.0 契约测试：代码安全员 / 监察员 / 裁判员 / 角色按需启用矩阵 / 主动巡视。
 
 测试从 spec 派生，不从实现派生：
-  docs/specs/2026-11-18-reviewer-judge-roles.md（C1–C23 / A1–A22）
+  ship-it/docs/specs/2026-11-18-reviewer-judge-roles.md（C1–C23 / A1–A22）
 运行：
   Step 4：python -m unittest tests.test_reviewer_judge_contract -v
   Step 5（回填 §9 后）：SHIP_IT_VERIFY=1 python -m unittest tests.test_reviewer_judge_contract -v
